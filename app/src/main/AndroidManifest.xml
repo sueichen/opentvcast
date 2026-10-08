@@ -68,7 +68,12 @@
 
             - launchMode="singleTop": prevents duplicate instances when
               the user launches the app again while it's running
-            - screenOrientation="landscape": TV apps are always landscape
+            - screenOrientation="landscape": TV apps are always landscape, and Android TV
+              refuses an application's request to rotate the display (measured: a portrait
+              request is accepted but the display stays ROTATION_0; only the system-wide
+              user_rotation setting rotates it, and that needs WRITE_SETTINGS and would
+              outlive the app). "Portrait TV" is therefore implemented by rotating the
+              *video* inside this window — see StreamingScreen and FR-58.
             - configChanges: handle orientation/screen size changes ourselves
               to avoid destroying the RTSP session on a config change
         -->

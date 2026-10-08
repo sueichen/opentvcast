@@ -103,4 +103,8 @@
 
     <string name="setting_video_url_mode">Video URL mode</string>
     <string name="setting_video_url_mode_subtitle">Off = mirror only. Video apps will then report that they cannot play on this TV — start Screen Mirroring instead</string>
+    <string name="setting_portrait_panel">Portrait TV</string>
+    <string name="setting_portrait_panel_subtitle">On: the TV is rotated 90°, so the app shows in portrait and vertical video fills the screen. Your TV\'s own settings are untouched</string>
+    <string name="setting_portrait_direction">Rotate direction</string>
+    <string name="setting_portrait_direction_subtitle">Only used when Portrait TV is on — pick whichever way the picture reads upright</string>
 </resources>

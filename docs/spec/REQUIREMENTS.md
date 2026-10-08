@@ -16,8 +16,8 @@ opentvcast v1 ships exactly **two** protocols:
 | **AirPlay 2** — screen mirroring, audio, video URL, photos, DACP remote | Implemented |
 | **DLNA / UPnP AV MediaRenderer** | Implemented, not verified on hardware (§1.3) |
 
-Mirror display orientation is **designed, not implemented** (§1.8, FR-58/FR-59).
-The video-URL-mode switch is **implemented** (§1.8, FR-60/FR-61).
+Mirror display orientation and the video-URL-mode switch are **implemented**
+(§1.8, FR-58…FR-61). Neither has been exercised against a real sender.
 
 **Miracast and Google Cast are not in v1, and this is a decision rather than a
 backlog item:**
@@ -160,10 +160,8 @@ it has been exercised against a real control point, so treat FR-37 as unproven.
 | Mirror audio | ON | Receive mirroring audio |
 
 | Video URL mode | ON | Allow the sender to hand the TV a URL; off = mirror only |
-
-**Portrait TV** and **Rotate direction** are designed but not implemented
-(§1.8, FR-58/FR-59) and are therefore not in the table above, which states what
-the app configures today.
+| Portrait TV | OFF | The TV is rotated 90°: the mirrored picture is rotated to match |
+| Rotate direction | Left | Which way the panel was turned (left / right) |
 
 ### 1.6 Media playback
 
@@ -182,19 +180,22 @@ the app configures today.
 
 ### 1.8 Display orientation and playback source
 
-**Status: mirror orientation is designed, not implemented; the playback-source
-switch is implemented.** Both have design documents carrying the measured numbers,
-the rejected alternatives and their validation gates.
+**Status: implemented.** Both features are in the tree; the design documents carry
+the measured numbers, the rejected alternatives and what remains unverified. In short:
+rotating the *display* is refused by Android TV, so the picture is rotated inside the
+app's own window — no permission, and undone when the app exits.
 
 - [`FEATURE-mirror-orientation.md`](FEATURE-mirror-orientation.md) — portrait-mounted
   panels, rotation-aware framing
 - [`FEATURE-video-url-mode.md`](FEATURE-video-url-mode.md) — mirroring-only mode
 
-- FR-58: The user MUST be able to declare the panel's physical orientation —
-  landscape (default) or rotated 90°. In the rotated case the mirroring picture
-  MUST be rotated so it reads upright, and MUST NOT be cropped to remove the bars.
-- FR-59: The rotation direction MUST be selectable (clockwise or
-  counter-clockwise), since which is correct depends on how the panel was turned.
+- FR-58: **Implemented.** The user can declare the panel's physical orientation —
+  landscape (default) or rotated 90°. In the rotated case the mirroring picture is rotated
+  so it reads upright and is not cropped. Implemented by rotating the video inside the app's
+  own window: Android TV refuses an application's display-orientation request (measured), and
+  the system-wide rotation setting needs `WRITE_SETTINGS` and would outlive the app.
+- FR-59: **Implemented.** The rotation direction is selectable (left = 90°,
+  right = 270°), since which is correct depends on how the panel was turned.
 - FR-60: **Implemented.** The user can disable AirPlay **video URL playback**, so
   the receiver mirrors only and never fetches media itself. Default: **enabled**
   (today's behaviour). The switch is applied to a running receiver without a

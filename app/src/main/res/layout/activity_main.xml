@@ -106,6 +106,7 @@
     <!-- ── Full-screen streaming overlay (GONE when idle) ─────────────── -->
     <FrameLayout
         android:id="@+id/streaming_container"
+        android:clipChildren="false"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:visibility="gone" />

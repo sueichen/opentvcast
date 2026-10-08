@@ -95,7 +95,27 @@ data class AppSettings(
      * it will not; a video app that is refused usually reports that it cannot play on
      * this TV, and the user has to start Screen Mirroring.
      */
-    val videoUrlModeEnabled: Boolean = true
+    val videoUrlModeEnabled: Boolean = true,
+
+    /**
+     * Physical orientation of the panel this TV is running on (FR-58).
+     *
+     * `LANDSCAPE` (default) is the ordinary case. `PORTRAIT` means the user rotated the
+     * panel 90°, and the app asks the platform for a portrait window so vertical content
+     * fills the panel's long edge instead of sitting pillarboxed in the middle.
+     *
+     * Activity-scoped by design: the request lasts only while this app is on screen, so
+     * leaving the app returns the TV to its system state.
+     */
+    val mirrorOrientation: MirrorOrientation = MirrorOrientation.LANDSCAPE,
+
+    /**
+     * Which way the panel was turned, for [MirrorOrientation.PORTRAIT] (FR-59).
+     *
+     * The two values give the two possible upright results; one of them will look upside
+     * down, so this is a user choice rather than something to detect.
+     */
+    val portraitRotation: PortraitRotation = PortraitRotation.LEFT
 ) {
 
     /** Advertised mirroring display size: 2560×1440 when [forceHighResolution], else 1920×1080. */

@@ -208,8 +208,3 @@ Stated here rather than buried in a roadmap:
   device. The adapters around them are injected ports, so the logic around them
   is tested; the hardware is not.
 - Instrumented tests compile but do not run in CI.
-- **Portrait-panel mirroring is designed but not implemented**: the panel's physical
-  orientation is not yet a setting, so a vertical stream is pillarboxed on a rotated
-  panel. The design carries the measured numbers, the three candidate rendering
-  strategies and their validation gate — see `docs/spec/REQUIREMENTS.md` §1.8 and
-  [`spec/FEATURE-mirror-orientation.md`](spec/FEATURE-mirror-orientation.md).

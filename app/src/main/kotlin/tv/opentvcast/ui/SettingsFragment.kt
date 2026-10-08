@@ -17,6 +17,8 @@ import androidx.lifecycle.lifecycleScope
 import tv.opentvcast.BuildConfig
 import tv.opentvcast.R
 import tv.opentvcast.settings.AppSettings
+import tv.opentvcast.settings.MirrorOrientation
+import tv.opentvcast.settings.PortraitRotation
 import tv.opentvcast.settings.SettingsRepository
 import tv.opentvcast.util.Logger
 import kotlinx.coroutines.flow.first
@@ -55,6 +57,8 @@ class SettingsFragment : Fragment() {
     private lateinit var rowMirrorAudio: View
     private lateinit var rowPinAuth: View
     private lateinit var rowVideoUrlMode: View
+    private lateinit var rowPortraitPanel: View
+    private lateinit var rowPortraitDirection: View
     private lateinit var rowStartOnBoot: View
     private lateinit var rowDebugOverlay: View
     private lateinit var rowForceHighRes: View
@@ -93,6 +97,8 @@ class SettingsFragment : Fragment() {
         rowMirrorAudio      = view.findViewById(R.id.row_mirror_audio)
         rowPinAuth          = view.findViewById(R.id.row_pin_auth)
         rowVideoUrlMode     = view.findViewById(R.id.row_video_url_mode)
+        rowPortraitPanel    = view.findViewById(R.id.row_portrait_panel)
+        rowPortraitDirection = view.findViewById(R.id.row_portrait_direction)
         rowStartOnBoot      = view.findViewById(R.id.row_start_on_boot)
         rowDebugOverlay     = view.findViewById(R.id.row_debug_overlay)
         rowForceHighRes     = view.findViewById(R.id.row_force_high_res)
@@ -117,6 +123,8 @@ class SettingsFragment : Fragment() {
         configureToggleRow(rowMirrorAudio,  R.string.setting_mirror_audio,       R.string.setting_mirror_audio_subtitle)
         configureToggleRow(rowPinAuth,      R.string.setting_pin_auth,           R.string.setting_pin_auth_subtitle)
         configureToggleRow(rowVideoUrlMode, R.string.setting_video_url_mode,     R.string.setting_video_url_mode_subtitle)
+        configureToggleRow(rowPortraitPanel, R.string.setting_portrait_panel,    R.string.setting_portrait_panel_subtitle)
+        configureToggleRow(rowPortraitDirection, R.string.setting_portrait_direction, R.string.setting_portrait_direction_subtitle)
         configureToggleRow(rowStartOnBoot,  R.string.setting_start_on_boot,      0)
         configureToggleRow(rowDebugOverlay, R.string.setting_debug_overlay,      R.string.setting_debug_overlay_subtitle)
         configureToggleRow(rowForceHighRes, R.string.setting_force_high_res,      R.string.setting_force_high_res_subtitle)
@@ -166,6 +174,8 @@ class SettingsFragment : Fragment() {
         setToggle(rowMirrorAudio,  settings.mirrorAudioEnabled)
         setToggle(rowPinAuth,      settings.airPlayPinAuthEnabled)
         setToggle(rowVideoUrlMode, settings.videoUrlModeEnabled)
+        setToggle(rowPortraitPanel, settings.mirrorOrientation == MirrorOrientation.PORTRAIT)
+        setToggle(rowPortraitDirection, settings.portraitRotation == PortraitRotation.RIGHT)
         setToggle(rowStartOnBoot,  settings.startOnBoot)
         setToggle(rowDebugOverlay, settings.showDebugOverlay)
         setToggle(rowForceHighRes, settings.forceHighResolution)
@@ -194,6 +204,20 @@ class SettingsFragment : Fragment() {
         // Applied live rather than by restart: the RTSP handler reads this per request,
         // and restarting for it would drop a mirror the user is watching.
         setToggleListener(rowVideoUrlMode) { enabled -> saveAndApplyLive { it.copy(videoUrlModeEnabled = enabled) } }
+
+        // Orientation is an activity-level concern: MainActivity observes the repository
+        // itself, so saving is enough and the change appears at once. No service restart,
+        // and nothing about the receiver changes.
+        setToggleListener(rowPortraitPanel) { on ->
+            save {
+                it.copy(
+                    mirrorOrientation = if (on) MirrorOrientation.PORTRAIT else MirrorOrientation.LANDSCAPE,
+                )
+            }
+        }
+        setToggleListener(rowPortraitDirection) { right ->
+            save { it.copy(portraitRotation = if (right) PortraitRotation.RIGHT else PortraitRotation.LEFT) }
+        }
         setToggleListener(rowStartOnBoot)  { enabled -> save { it.copy(startOnBoot = enabled) } }
         setToggleListener(rowDebugOverlay) { enabled -> save { it.copy(showDebugOverlay = enabled) } }
         setToggleListener(rowForceHighRes) { enabled -> save { it.copy(forceHighResolution = enabled) } }

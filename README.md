@@ -75,7 +75,7 @@ socket loops and the player are not (see `docs/ARCHITECTURE.md` → Known gaps).
 
 - Android TV / Fire TV app shell: foreground service, status UI, per-protocol cards
 - Settings for display name, mirror resolution, mirror audio, PIN auth, video URL
-  mode, start-on-boot, and a debug stats overlay
+  mode, portrait TV (rotated panel), start-on-boot, and a debug stats overlay
 - Two flavors: Google TV (Android 10+) and Fire TV (Android 7.1+)
 - No ads, no analytics, no network calls beyond the local subnet
 - GPLv3, with complete source
@@ -221,6 +221,10 @@ No SDK on hand? The SDK-free subset still runs:
   mirror to the TV. Turn it on in Settings on a shared network, and see
   `docs/decisions/` for why the default is what it is.
 - **Buffered audio (type 103)** is accepted but not played back.
+- **Portrait TV rotates the picture, not your TV.** It is for a panel that has been
+  rotated 90° by hand: the mirrored picture is turned to match, and the app's own UI stays
+  landscape. Leaving the app ends the rotation. Correct framing has not been verified
+  against a real sender.
 - **Turning video URL mode off does not make a sender mirror.** It refuses the
   sender's URL instead; a video app will usually report that it cannot play on this
   TV, and you have to start Screen Mirroring yourself.

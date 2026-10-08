@@ -115,7 +115,13 @@ class SettingsRepository(private val context: Context) {
         showDebugOverlay   = this[Keys.SHOW_DEBUG_OVERLAY]      ?: false,
         forceHighResolution = this[Keys.FORCE_HIGH_RESOLUTION]  ?: false,
         mirrorAudioEnabled = this[Keys.MIRROR_AUDIO_ENABLED]    ?: true,
-        videoUrlModeEnabled = this[Keys.VIDEO_URL_MODE_ENABLED]  ?: true
+        videoUrlModeEnabled = this[Keys.VIDEO_URL_MODE_ENABLED]  ?: true,
+        mirrorOrientation = this[Keys.MIRROR_ORIENTATION]
+            ?.let { name -> MirrorOrientation.entries.firstOrNull { it.name == name } }
+            ?: MirrorOrientation.LANDSCAPE,
+        portraitRotation = this[Keys.PORTRAIT_ROTATION]
+            ?.let { name -> PortraitRotation.entries.firstOrNull { it.name == name } }
+            ?: PortraitRotation.LEFT
     )
 
     /**
@@ -132,6 +138,8 @@ class SettingsRepository(private val context: Context) {
         this[Keys.FORCE_HIGH_RESOLUTION] = settings.forceHighResolution
         this[Keys.MIRROR_AUDIO_ENABLED] = settings.mirrorAudioEnabled
         this[Keys.VIDEO_URL_MODE_ENABLED] = settings.videoUrlModeEnabled
+        this[Keys.MIRROR_ORIENTATION] = settings.mirrorOrientation.name
+        this[Keys.PORTRAIT_ROTATION] = settings.portraitRotation.name
     }
 
     /**
@@ -150,5 +158,10 @@ class SettingsRepository(private val context: Context) {
         val FORCE_HIGH_RESOLUTION = booleanPreferencesKey("force_high_resolution")
         val MIRROR_AUDIO_ENABLED = booleanPreferencesKey("mirror_audio_enabled")
         val VIDEO_URL_MODE_ENABLED = booleanPreferencesKey("video_url_mode_enabled")
+
+        // Stored as the enum name, not an ordinal: reordering the enum later would
+        // silently reinterpret every stored value if it were an ordinal.
+        val MIRROR_ORIENTATION = stringPreferencesKey("mirror_orientation")
+        val PORTRAIT_ROTATION = stringPreferencesKey("portrait_rotation")
     }
 }

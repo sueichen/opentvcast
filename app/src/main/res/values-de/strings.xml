@@ -77,4 +77,8 @@
 
     <string name="setting_video_url_mode">Video-URL-Modus</string>
     <string name="setting_video_url_mode_subtitle">Aus = nur spiegeln. Video-Apps melden dann, dass sie auf diesem Fernseher nicht abspielen können — stattdessen Bildschirmsynchronisierung starten</string>
+    <string name="setting_portrait_panel">Hochformat-TV</string>
+    <string name="setting_portrait_panel_subtitle">Ein: Der Fernseher ist um 90° gedreht, die App zeigt sich im Hochformat und vertikale Videos füllen den Bildschirm. Die Einstellungen des Fernsehers bleiben unverändert</string>
+    <string name="setting_portrait_direction">Drehrichtung</string>
+    <string name="setting_portrait_direction_subtitle">Nur bei eingeschaltetem Hochformat-TV — die Richtung wählen, in der das Bild richtig steht</string>
 </resources>

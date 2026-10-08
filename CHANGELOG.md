@@ -15,6 +15,14 @@ reproduced here.
 
 ### Added
 
+- **Portrait TV** (AirPlay mirroring): for a panel that has been rotated 90° by hand. The
+  mirrored picture is rotated 90° or 270° and refitted so vertical video fills the panel's
+  long edge with only narrow side bars, instead of sitting pillarboxed in the middle of a
+  landscape frame. Applied live, needs no permission, and is undone when the app exits —
+  the TV's own settings are never touched. Android TV refuses an application's
+  display-orientation request (measured), so the rotation happens inside the app's window.
+  The framing arithmetic is unit-tested; correct pixels on a real sender are not yet verified.
+
 - **Video URL mode switch** (AirPlay): the receiver can be made mirroring-only, so a
   sender's URL is never fetched and played by the TV itself. `POST /play` is refused
   with 403, an in-flight URL playback stops at once, and the other transport verbs

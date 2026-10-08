@@ -42,4 +42,8 @@
 
     <string name="setting_video_url_mode">Mode URL vidéo</string>
     <string name="setting_video_url_mode_subtitle">Désactivé = miroir uniquement. Les applis vidéo indiqueront qu\'elles ne peuvent pas lire sur ce téléviseur — lancez la recopie d\'écran</string>
+    <string name="setting_portrait_panel">TV en portrait</string>
+    <string name="setting_portrait_panel_subtitle">Activé : le téléviseur est tourné de 90°, l\'appli s\'affiche en portrait et les vidéos verticales remplissent l\'écran. Les réglages du téléviseur ne sont pas modifiés</string>
+    <string name="setting_portrait_direction">Sens de rotation</string>
+    <string name="setting_portrait_direction_subtitle">Utilisé seulement avec TV en portrait — choisissez le sens où l\'image est à l\'endroit</string>
 </resources>

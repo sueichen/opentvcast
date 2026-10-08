@@ -1,7 +1,28 @@
 # Feature design — Mirror display orientation
 
-**Status: designed, not implemented.** Requirements reserved: FR-58, FR-59.
-Decisions taken 2026-10-08. Implementation has not started.
+**Status: implemented.** Requirements FR-58, FR-59. Decisions taken 2026-10-08,
+implemented the same day.
+
+**The validation gate changed the design.** The plan's first strategy was to ask the
+platform for a portrait window (`requestedOrientation`), which would have made this feature
+about twenty lines. Measured on an Android 14 TV image, that does not work:
+
+| Probe | Result |
+|---|---|
+| App requests `SCREEN_ORIENTATION_PORTRAIT` | request accepted — `Panel orientation applied: PORTRAIT` — and **the display does not move**: still 1920×1080, `mRotation=0`, window `land television` |
+| System-wide `user_rotation=1` | **the display rotates**: 1080×1920, `mRotation=ROTATION_90`, window `port television` |
+
+So the panel *can* be portrait, but Android TV refuses an application's orientation request;
+only the system setting rotates it, and that needs `WRITE_SETTINGS`, would outlive the app,
+and is exactly what "don't touch my TV" forbids. The implementation therefore rotates the
+**picture inside the app's own window** — the design's S1 — which needs no permission and is
+undone the moment the app exits.
+
+What is verified where: the framing arithmetic is unit-tested against §3.3's numbers
+(`MirrorFitTest`), and the wiring was confirmed on the emulator (`Panel orientation published:
+PORTRAIT/LEFT` → `StreamingScreen: picture rotated 90°` 150 ms later). **The pixels — a real
+portrait stream filling the panel's long edge — still need a sender**, which the emulator
+cannot provide.
 
 Turns a portrait-mounted TV into a first-class configuration instead of an
 accident: the mirroring picture is rotated 90°, so vertical short-form video fills
@@ -52,6 +73,12 @@ correctly; the bars that remain are the ones the content's aspect ratio forces.
 ### 3.2 Framing rules
 
 Let `src = (vw, vh)` be the decoded video size and `panel = (1920, 1080)`.
+
+**As implemented.** `PanelOrientationMapping` maps the two settings to a rotation angle
+(0° / 90° / 270°); `MirrorFit` turns that plus the video and container sizes into the view's
+layout box; `StreamingScreen` applies the box and the rotation. One finding from building it:
+the box must be the **transpose** of the displayed rectangle, which is why a portrait picture
+needs a view taller than the window and why `clipChildren` is off on the streaming container.
 
 | Mode | Effective content size | Same as today? |
 |---|---|---|
@@ -107,7 +134,7 @@ Three strategies exist; the choice is not made until it is measured.
 
 | | Strategy | How | Risk / cost |
 |---|---|---|---|
-| **S1** (preferred) | Oversized `SurfaceView` + `View.rotation` | Lay the view out as `(rectH × rectW)`, set `clipChildren = false` up the parent chain, apply `rotation = ±90°`. | The layout box is taller than the window (e.g. 1920 px in a 1080 px window). SurfaceView transforms and out-of-bounds boxes behave inconsistently across TV SoCs. |
+| **S1** (preferred) — **the one that shipped** | Oversized `SurfaceView` + `View.rotation` | Lay the view out as `(rectH × rectW)`, set `clipChildren = false` up the parent chain, apply `rotation = ±90°`. | The layout box is taller than the window (e.g. 1920 px in a 1080 px window). SurfaceView transforms and out-of-bounds boxes behave inconsistently across TV SoCs — **this is the part that still needs a real sender to confirm.** |
 | **S2** (fallback) | `TextureView` while in portrait mode | TextureView accepts arbitrary transforms; it can be laid out oversized and rotated reliably. | An extra GPU copy and roughly one frame of latency — against this project's "SurfaceView for lowest latency" choice, which is why it is a fallback, not the default. |
 | **S3** (investigate) | Composer-side buffer transform | `SurfaceControl.Transaction.setBufferTransform` (or `Surface.setBuffersTransform`) rotates the buffer with no layout gymnastics. | Availability and behaviour on TV SoCs are unverified; must be checked against platform docs before being relied on. |
 
@@ -123,7 +150,10 @@ path untouched.
 ## 6. Settings and UI
 
 Two rows, both using the existing whole-row-clickable `SwitchCompat` template — no
-new layouts, and consistent with the rest of the settings screen:
+new layouts, and consistent with the rest of the settings screen. Both are **applied live**:
+the settings screen saves, `MainActivity` observes the repository, and `StreamingScreen`
+re-reads the angle on its next 200 ms pass — no service restart, so a mirror being watched
+survives the change.
 
 | Row | Values | Default | Key |
 |---|---|---|---|

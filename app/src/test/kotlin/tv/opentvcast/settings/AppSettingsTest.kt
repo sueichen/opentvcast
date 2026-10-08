@@ -45,6 +45,14 @@ class AppSettingsTest {
     }
 
     @Test
+    fun `default settings describe a landscape panel`() {
+        // The default must be the ordinary case: an upgrade cannot start rotating
+        // someone's TV because they installed a new build.
+        assertEquals(MirrorOrientation.LANDSCAPE, AppSettings.DEFAULT.mirrorOrientation)
+        assertEquals(PortraitRotation.LEFT, AppSettings.DEFAULT.portraitRotation)
+    }
+
+    @Test
     fun `default settings allow video URL playback`() {
         // A capability the user already had must not disappear on upgrade; the switch is
         // opt-out, and this test is what says so.

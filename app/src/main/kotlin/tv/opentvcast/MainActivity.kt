@@ -8,6 +8,9 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
+import tv.opentvcast.settings.SettingsRepository
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import android.view.View
@@ -25,6 +28,7 @@ import tv.opentvcast.ui.PhotoScreen
 import tv.opentvcast.ui.PinScreen
 import tv.opentvcast.ui.SettingsFragment
 import tv.opentvcast.ui.StreamingScreen
+import tv.opentvcast.ui.PanelOrientationState
 import timber.log.Timber
 import tv.opentvcast.core.flow.RebindableCollectorGroup
 import tv.opentvcast.core.protocol.ProtocolState
@@ -115,6 +119,25 @@ class MainActivity : AppCompatActivity() {
 
         // Android 13+ requires an explicit runtime grant for POST_NOTIFICATIONS
         requestNotificationPermission()
+
+        applyPanelOrientation()
+    }
+
+    /**
+     * Publishes the "Portrait TV" setting for [StreamingScreen] to act on (FR-58).
+     *
+     * Deliberately *not* `requestedOrientation`: Android TV refuses an application's
+     * display-orientation request (see [PanelOrientationMapping]), so the rotation is
+     * applied to the video inside this window instead. The window, the app UI and the TV's
+     * own settings are untouched — leaving the app ends the rotation with it.
+     */
+    private fun applyPanelOrientation() {
+        lifecycleScope.launch {
+            SettingsRepository(applicationContext).settingsFlow.collect { settings ->
+                PanelOrientationState.apply(settings.mirrorOrientation, settings.portraitRotation)
+                Timber.i("Panel orientation published: ${settings.mirrorOrientation}/${settings.portraitRotation}")
+            }
+        }
     }
 
     override fun onStart() {

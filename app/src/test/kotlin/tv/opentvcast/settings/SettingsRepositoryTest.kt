@@ -53,6 +53,8 @@ class SettingsRepositoryTest {
                 forceHighResolution = true,
                 mirrorAudioEnabled = false,
                 videoUrlModeEnabled = false,
+                mirrorOrientation = MirrorOrientation.PORTRAIT,
+                portraitRotation = PortraitRotation.RIGHT,
             )
         }
         val updated = repo.settingsFlow.first()
@@ -65,6 +67,8 @@ class SettingsRepositoryTest {
         assertTrue(updated.forceHighResolution)
         assertFalse(updated.mirrorAudioEnabled)
         assertFalse(updated.videoUrlModeEnabled)
+        assertEquals(MirrorOrientation.PORTRAIT, updated.mirrorOrientation)
+        assertEquals(PortraitRotation.RIGHT, updated.portraitRotation)
 
         // A partial update that says nothing about video URL mode must leave it alone:
         // a transform written for another setting cannot silently re-enable (or disable)

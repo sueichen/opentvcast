@@ -13,6 +13,7 @@ import android.view.Surface
 import android.widget.FrameLayout
 import android.widget.TextView
 import tv.opentvcast.airplay.StreamStats
+import tv.opentvcast.core.video.MirrorFit
 import tv.opentvcast.util.Logger
 
 /**
@@ -63,6 +64,9 @@ class StreamingScreen @JvmOverloads constructor(
     private var lastSurfaceW = Int.MIN_VALUE
     private var lastSurfaceH = Int.MIN_VALUE
 
+    // Last applied picture rotation, for the same reason: the setting can change mid-session.
+    private var lastRotation = Int.MIN_VALUE
+
     private val handler = Handler(Looper.getMainLooper())
     private val tick = object : Runnable {
         override fun run() {
@@ -82,6 +86,12 @@ class StreamingScreen @JvmOverloads constructor(
         // and doesn't fill 16:9) are black — without this, those margins are transparent and the home
         // menu shows through behind the streaming overlay. The SurfaceView punches its own hole on top.
         setBackgroundColor(Color.BLACK)
+
+        // "Portrait TV" lays the video out as a rectangle taller than this window and
+        // rotates it into place (see MirrorFit). The overhang is empty space — the picture
+        // itself lands inside the window — so clipping it away would cut the picture, not
+        // the overhang. The parent container turns its own clipping off for the same reason.
+        clipChildren = false
 
         // SurfaceView is centred; its size is set to the video's aspect ratio by applyAspectFit().
         addView(surfaceView, LayoutParams(
@@ -129,29 +139,44 @@ class StreamingScreen @JvmOverloads constructor(
     fun getSurface(): Surface? = surface
 
     /**
-     * Sizes the SurfaceView to the decoded video's aspect ratio (letterbox/pillarbox) instead of
-     * stretching it to fill 16:9. Without this, a portrait phone stream is squashed horizontally.
-     * Falls back to filling the container when the size isn't known yet.
+     * Sizes the SurfaceView to the decoded video's aspect ratio (letterbox/pillarbox), rotates it
+     * when the panel is declared rotated, and never stretches. Falls back to filling the container
+     * while the video size is still unknown.
+     *
+     * The arithmetic lives in [MirrorFit] so it can be tested without a device; this method only
+     * applies its answer. Two details are load-bearing here:
+     *
+     * - **The box is the transpose of what is displayed.** Rotating a view swaps its extents, so a
+     *   portrait picture on a landscape window needs a view *taller than the window*. That is why
+     *   `clipChildren` is off.
+     * - **Rotation is re-applied when the setting changes**, not only when the video size does —
+     *   the user can flip "Portrait TV" while a mirror is running.
      */
     private fun applyAspectFit() {
-        val vw = StreamStats.videoWidth
-        val vh = StreamStats.videoHeight
-        val cw = width
-        val ch = height
-        val (targetW, targetH) = if (vw <= 0 || vh <= 0 || cw <= 0 || ch <= 0) {
-            LayoutParams.MATCH_PARENT to LayoutParams.MATCH_PARENT
-        } else {
-            val videoRatio = vw.toFloat() / vh
-            val containerRatio = cw.toFloat() / ch
-            if (videoRatio > containerRatio) cw to (cw / videoRatio).toInt()   // fit width, bars top/bottom
-            else (ch * videoRatio).toInt() to ch                              // fit height, bars left/right
-        }
-        if (targetW == lastSurfaceW && targetH == lastSurfaceH) return
+        val degrees = PanelOrientationState.rotationDegrees
+        val box = MirrorFit.boxFor(
+            videoWidth = StreamStats.videoWidth,
+            videoHeight = StreamStats.videoHeight,
+            containerWidth = width,
+            containerHeight = height,
+            rotationDegrees = degrees,
+        )
+        val (targetW, targetH) = box?.let { it.widthPx to it.heightPx }
+            ?: (LayoutParams.MATCH_PARENT to LayoutParams.MATCH_PARENT)
+
+        if (targetW == lastSurfaceW && targetH == lastSurfaceH && degrees == lastRotation) return
         lastSurfaceW = targetW
         lastSurfaceH = targetH
+        lastRotation = degrees
+
+        if (surfaceView.rotation != degrees.toFloat()) {
+            surfaceView.rotation = degrees.toFloat()
+            Logger.d("StreamingScreen: picture rotated ${degrees}°")
+        }
         surfaceView.layoutParams = (surfaceView.layoutParams as LayoutParams).apply {
             width = targetW; height = targetH; gravity = Gravity.CENTER
         }
+        Logger.d("StreamingScreen: video ${StreamStats.videoWidth}x${StreamStats.videoHeight} → box ${targetW}x$targetH (rotation ${degrees}°)")
     }
 
     override fun onAttachedToWindow() {
