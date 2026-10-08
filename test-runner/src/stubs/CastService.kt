@@ -21,5 +21,6 @@ class CastService {
         val ACTION_START    = CastServiceContract.ACTION_START
         val ACTION_STOP     = CastServiceContract.ACTION_STOP
         val ACTION_RESTART  = CastServiceContract.ACTION_RESTART
+        val ACTION_APPLY_SETTINGS = CastServiceContract.ACTION_APPLY_SETTINGS
     }
 }

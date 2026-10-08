@@ -24,7 +24,7 @@ import org.junit.Test
  */
 class RtspVideoControlTest {
 
-    private class Harness {
+    private class Harness(urlModeEnabled: Boolean = true, gate: (() -> Boolean)? = null) {
         val played = mutableListOf<Pair<String, Double>>()
         val rates = mutableListOf<Float>()
         val scrubs = mutableListOf<Double>()
@@ -39,6 +39,7 @@ class RtspVideoControlTest {
             onVideoScrub = { scrubs.add(it) },
             onVideoStop = { stops++ },
             onPlaybackInfo = { info },
+            urlModeEnabled = gate ?: { urlModeEnabled },
         )
     }
 
@@ -83,6 +84,57 @@ class RtspVideoControlTest {
 
         assertEquals(400, response.statusCode)
         assertTrue(h.played.isEmpty())
+    }
+
+    // ─── Video URL mode disabled by settings (FR-60, FR-61) ───────────────────
+
+    @Test
+    fun `play is refused and never reaches the player when URL mode is disabled`() {
+        val h = Harness(urlModeEnabled = false)
+        val bodyBytes = PlistCodec.encode(mapOf("Content-Location" to "http://example.com/movie.m3u8"))
+
+        val response = h.control.play(RtspRequest("POST", "/play", emptyMap(), "", bodyBytes))
+
+        assertEquals("understood but refused by policy", 403, response.statusCode)
+        assertTrue("the player must never be started", h.played.isEmpty())
+    }
+
+    @Test
+    fun `URL mode enabled still plays — regression guard for the default path`() {
+        val h = Harness()
+        val bodyBytes = PlistCodec.encode(mapOf("Content-Location" to "http://example.com/movie.m3u8"))
+
+        val response = h.control.play(RtspRequest("POST", "/play", emptyMap(), "", bodyBytes))
+
+        assertEquals(200, response.statusCode)
+        assertEquals(listOf("http://example.com/movie.m3u8" to 0.0), h.played)
+    }
+
+    @Test
+    fun `URL mode switched off mid-session is honoured on the next request`() {
+        // The gate is a callback, not a snapshot: a session opened while URL mode
+        // was on must see the change immediately, otherwise turning the switch off
+        // would only take effect after the sender reconnects.
+        var enabled = true
+        val h = Harness(gate = { enabled })
+        val bodyBytes = PlistCodec.encode(mapOf("Content-Location" to "http://example.com/one.mp4"))
+
+        assertEquals(200, h.control.play(RtspRequest("POST", "/play", emptyMap(), "", bodyBytes)).statusCode)
+        enabled = false
+        assertEquals(403, h.control.play(RtspRequest("POST", "/play", emptyMap(), "", bodyBytes)).statusCode)
+
+        assertEquals("only the first request may reach the player", 1, h.played.size)
+    }
+
+    @Test
+    fun `transport verbs keep answering while URL mode is disabled`() {
+        // A sender whose /play was refused still polls these; answering 4xx for
+        // them too would look like the session died rather than one feature off.
+        val h = Harness(urlModeEnabled = false)
+
+        assertEquals(200, h.control.rate(request("POST", "/rate?value=1")).statusCode)
+        assertEquals(200, h.control.scrubGet(request("GET", "/scrub")).statusCode)
+        assertEquals(200, h.control.stop(request("POST", "/stop")).statusCode)
     }
 
     // ─── /rate, /scrub, /stop ─────────────────────────────────────────────────

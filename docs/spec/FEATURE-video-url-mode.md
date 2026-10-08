@@ -1,7 +1,14 @@
 # Feature design — Video URL mode switch (force mirroring)
 
-**Status: designed, not implemented.** Requirements reserved: FR-60, FR-61.
-Decision taken 2026-10-08. Implementation has not started.
+**Status: implemented.** Requirements FR-60, FR-61. Decision taken 2026-10-08,
+implemented the same day.
+
+Verified end to end against the app running on an Android 14 TV emulator, over a
+real socket from the host: `POST /play` answers `200 OK` with the switch on and
+`403 Forbidden` with it off, the log line names the refusal, and `/rate`, `/scrub`
+and `/stop` keep answering `200` so the session stays coherent. Toggling the switch
+applied live — `Live settings applied: videoUrlModeEnabled=false` — with no restart
+and no session teardown.
 
 Adds a setting that turns off AirPlay **video URL playback**, so that a sender's
 video is never fetched and played by the TV itself. With the switch off, the
@@ -66,11 +73,17 @@ switch looks broken the first time someone taps AirPlay inside a video app.
 
 ## 5. Live toggling
 
-The receiver must react to the switch changing while a session is open:
+**As implemented.** The setting reaches a running receiver through a new
+restart-free path: the settings row saves, then calls `ServiceController.applySettings()`,
+which sends `ACTION_APPLY_SETTINGS`; `CastService` handles that action by calling
+`AirPlayReceiver.setVideoUrlModeEnabled()`. It deliberately does *not* go through
+`ACTION_RESTART` (the mechanism every other AirPlay setting uses), because
+restarting would tear down a mirror the user is watching for a change that costs
+nothing to apply in place.
 
 | Event | Action |
 |---|---|
-| Switch turned OFF while URL playback is running | Stop and release `AirPlayVideoPlayer`, clear the reference, end the streaming overlay (`stopUrlVideo()` already does the teardown), keep the RTSP session alive so mirroring can begin immediately. |
+| Switch turned OFF while URL playback is running | `setVideoUrlModeEnabled(false)` stops and releases `AirPlayVideoPlayer` immediately and ends the streaming overlay; the RTSP session survives, so mirroring can start at once. |
 | Switch turned ON | Nothing to undo; the next `POST /play` is served normally. |
 
 The gate must therefore read the setting **through a callback, not a snapshot** —
@@ -100,7 +113,7 @@ whose tests cover the video endpoints.
 | `RtspVideoControlTest` | `:airplay` | With the gate off, `play()` returns 4xx **and `onVideoPlay` is never invoked** (the assertion that matters — a 4xx alone could ship with playback still starting). With the gate on, the existing behaviour is unchanged: regression guard for the default path. Also: gate flipped mid-session is honoured on the next call. |
 | `AppSettingsTest` | `:app` | default is `true`; `copy` keeps other fields |
 | `SettingsRepositoryTest` | `:app` (Robolectric) | key round-trips; a pre-existing settings file loads with the default |
-| `AirPlayReceiverTest` | `:airplay` | Toggling off while a fake URL player is live releases it and ends the overlay; mirroring state is untouched |
+| — | — | The receiver-level live stop has **no unit test** (deviation from the plan above): `urlVideoPlayer` is a concrete private field with no injected seam, and adding one meant either an interface for `AirPlayVideoPlayer` or a player factory — a refactor wider than this feature. Its behaviour was verified on the emulator instead (§5), and the decision table that matters is unit-tested one layer down in `RtspVideoControlTest`. |
 
 End-to-end check (emulator, cheap): `adb forward tcp:18200 tcp:8200` is DLNA; for
 this feature the check is `curl`-style `POST /play` against RTSP port 7000 with the

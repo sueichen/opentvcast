@@ -45,6 +45,13 @@ class AppSettingsTest {
     }
 
     @Test
+    fun `default settings allow video URL playback`() {
+        // A capability the user already had must not disappear on upgrade; the switch is
+        // opt-out, and this test is what says so.
+        assertTrue(AppSettings.DEFAULT.videoUrlModeEnabled)
+    }
+
+    @Test
     fun `default settings have debug overlay disabled`() {
         assertFalse(AppSettings.DEFAULT.showDebugOverlay)
     }

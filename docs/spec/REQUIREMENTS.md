@@ -16,8 +16,8 @@ opentvcast v1 ships exactly **two** protocols:
 | **AirPlay 2** — screen mirroring, audio, video URL, photos, DACP remote | Implemented |
 | **DLNA / UPnP AV MediaRenderer** | Implemented, not verified on hardware (§1.3) |
 
-Display orientation and playback-source controls are **designed, not
-implemented** — see §1.8 for the reserved requirements and the design documents.
+Mirror display orientation is **designed, not implemented** (§1.8, FR-58/FR-59).
+The video-URL-mode switch is **implemented** (§1.8, FR-60/FR-61).
 
 **Miracast and Google Cast are not in v1, and this is a decision rather than a
 backlog item:**
@@ -159,10 +159,11 @@ it has been exercised against a real control point, so treat FR-37 as unproven.
 | Mirror resolution | Device default | Requested mirroring resolution |
 | Mirror audio | ON | Receive mirroring audio |
 
-Two further settings are designed but not implemented — **Portrait TV** and
-**Rotate direction** (§1.8, FR-58/FR-59), and **Video URL mode** (§1.8, FR-60).
-They are not listed above, because that table states what the app configures
-today.
+| Video URL mode | ON | Allow the sender to hand the TV a URL; off = mirror only |
+
+**Portrait TV** and **Rotate direction** are designed but not implemented
+(§1.8, FR-58/FR-59) and are therefore not in the table above, which states what
+the app configures today.
 
 ### 1.6 Media playback
 
@@ -181,10 +182,9 @@ today.
 
 ### 1.8 Display orientation and playback source
 
-**Status: designed, not implemented.** Both features have a written design and
-reserved requirement numbers; no code exists yet. Implementation should follow the
-design documents, which carry the measured numbers, the rejected alternatives and
-the validation gates.
+**Status: mirror orientation is designed, not implemented; the playback-source
+switch is implemented.** Both have design documents carrying the measured numbers,
+the rejected alternatives and their validation gates.
 
 - [`FEATURE-mirror-orientation.md`](FEATURE-mirror-orientation.md) — portrait-mounted
   panels, rotation-aware framing
@@ -195,13 +195,15 @@ the validation gates.
   MUST be rotated so it reads upright, and MUST NOT be cropped to remove the bars.
 - FR-59: The rotation direction MUST be selectable (clockwise or
   counter-clockwise), since which is correct depends on how the panel was turned.
-- FR-60: The user MUST be able to disable AirPlay **video URL playback**, so the
-  receiver mirrors only and never fetches media itself. Default: **enabled**
-  (today's behaviour).
-- FR-61: While URL playback is disabled, `POST /play` MUST be refused with a 4xx
-  and MUST NOT start playback, while mirroring, mirroring audio, photos and DACP
-  continue to work unchanged. A refusal MUST NOT be reported to any part of the
-  system as a successful start.
+- FR-60: **Implemented.** The user can disable AirPlay **video URL playback**, so
+  the receiver mirrors only and never fetches media itself. Default: **enabled**
+  (today's behaviour). The switch is applied to a running receiver without a
+  restart, and turning it off stops an in-flight URL playback.
+- FR-61: **Implemented.** While URL playback is disabled, `POST /play` is refused
+  with 403 and never reaches the player, while mirroring, mirroring audio, photos
+  and DACP continue to work unchanged. The transport verbs keep answering, so a
+  refusal reads as one feature switched off rather than a dead session. Verified on
+  an Android 14 TV emulator: 200 with the switch on, 403 with it off.
 
 ---
 

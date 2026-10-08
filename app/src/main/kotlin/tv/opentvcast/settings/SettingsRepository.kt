@@ -114,7 +114,8 @@ class SettingsRepository(private val context: Context) {
         startOnBoot        = this[Keys.START_ON_BOOT]           ?: false,
         showDebugOverlay   = this[Keys.SHOW_DEBUG_OVERLAY]      ?: false,
         forceHighResolution = this[Keys.FORCE_HIGH_RESOLUTION]  ?: false,
-        mirrorAudioEnabled = this[Keys.MIRROR_AUDIO_ENABLED]    ?: true
+        mirrorAudioEnabled = this[Keys.MIRROR_AUDIO_ENABLED]    ?: true,
+        videoUrlModeEnabled = this[Keys.VIDEO_URL_MODE_ENABLED]  ?: true
     )
 
     /**
@@ -130,6 +131,7 @@ class SettingsRepository(private val context: Context) {
         this[Keys.SHOW_DEBUG_OVERLAY]   = settings.showDebugOverlay
         this[Keys.FORCE_HIGH_RESOLUTION] = settings.forceHighResolution
         this[Keys.MIRROR_AUDIO_ENABLED] = settings.mirrorAudioEnabled
+        this[Keys.VIDEO_URL_MODE_ENABLED] = settings.videoUrlModeEnabled
     }
 
     /**
@@ -147,5 +149,6 @@ class SettingsRepository(private val context: Context) {
         val SHOW_DEBUG_OVERLAY  = booleanPreferencesKey("show_debug_overlay")
         val FORCE_HIGH_RESOLUTION = booleanPreferencesKey("force_high_resolution")
         val MIRROR_AUDIO_ENABLED = booleanPreferencesKey("mirror_audio_enabled")
+        val VIDEO_URL_MODE_ENABLED = booleanPreferencesKey("video_url_mode_enabled")
     }
 }

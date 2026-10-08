@@ -54,6 +54,7 @@ class SettingsFragment : Fragment() {
     private lateinit var rowDlna: View
     private lateinit var rowMirrorAudio: View
     private lateinit var rowPinAuth: View
+    private lateinit var rowVideoUrlMode: View
     private lateinit var rowStartOnBoot: View
     private lateinit var rowDebugOverlay: View
     private lateinit var rowForceHighRes: View
@@ -91,6 +92,7 @@ class SettingsFragment : Fragment() {
         rowDlna             = view.findViewById(R.id.row_dlna)
         rowMirrorAudio      = view.findViewById(R.id.row_mirror_audio)
         rowPinAuth          = view.findViewById(R.id.row_pin_auth)
+        rowVideoUrlMode     = view.findViewById(R.id.row_video_url_mode)
         rowStartOnBoot      = view.findViewById(R.id.row_start_on_boot)
         rowDebugOverlay     = view.findViewById(R.id.row_debug_overlay)
         rowForceHighRes     = view.findViewById(R.id.row_force_high_res)
@@ -114,6 +116,7 @@ class SettingsFragment : Fragment() {
         configureToggleRow(rowDlna,     R.string.setting_dlna_enabled,   R.string.setting_dlna_subtitle)
         configureToggleRow(rowMirrorAudio,  R.string.setting_mirror_audio,       R.string.setting_mirror_audio_subtitle)
         configureToggleRow(rowPinAuth,      R.string.setting_pin_auth,           R.string.setting_pin_auth_subtitle)
+        configureToggleRow(rowVideoUrlMode, R.string.setting_video_url_mode,     R.string.setting_video_url_mode_subtitle)
         configureToggleRow(rowStartOnBoot,  R.string.setting_start_on_boot,      0)
         configureToggleRow(rowDebugOverlay, R.string.setting_debug_overlay,      R.string.setting_debug_overlay_subtitle)
         configureToggleRow(rowForceHighRes, R.string.setting_force_high_res,      R.string.setting_force_high_res_subtitle)
@@ -162,6 +165,7 @@ class SettingsFragment : Fragment() {
         setToggle(rowDlna,         settings.dlnaEnabled)
         setToggle(rowMirrorAudio,  settings.mirrorAudioEnabled)
         setToggle(rowPinAuth,      settings.airPlayPinAuthEnabled)
+        setToggle(rowVideoUrlMode, settings.videoUrlModeEnabled)
         setToggle(rowStartOnBoot,  settings.startOnBoot)
         setToggle(rowDebugOverlay, settings.showDebugOverlay)
         setToggle(rowForceHighRes, settings.forceHighResolution)
@@ -187,6 +191,9 @@ class SettingsFragment : Fragment() {
         setToggleListener(rowDlna)         { enabled -> saveAndRestart { it.copy(dlnaEnabled = enabled) } }
         setToggleListener(rowMirrorAudio)  { enabled -> saveAndRestart { it.copy(mirrorAudioEnabled = enabled) } }
         setToggleListener(rowPinAuth)      { enabled -> saveAndRestart { it.copy(airPlayPinAuthEnabled = enabled) } }
+        // Applied live rather than by restart: the RTSP handler reads this per request,
+        // and restarting for it would drop a mirror the user is watching.
+        setToggleListener(rowVideoUrlMode) { enabled -> saveAndApplyLive { it.copy(videoUrlModeEnabled = enabled) } }
         setToggleListener(rowStartOnBoot)  { enabled -> save { it.copy(startOnBoot = enabled) } }
         setToggleListener(rowDebugOverlay) { enabled -> save { it.copy(showDebugOverlay = enabled) } }
         setToggleListener(rowForceHighRes) { enabled -> save { it.copy(forceHighResolution = enabled) } }
@@ -221,6 +228,19 @@ class SettingsFragment : Fragment() {
      * Saves a setting that the AirPlay receiver only reads at startup (mirror-audio, PIN auth), then
      * restarts the service so the change applies immediately instead of on the next manual restart.
      */
+    /**
+     * Saves a setting that the running receivers can pick up without a restart, then tells
+     * them to do so (FR-60). Restarting would tear down an in-progress mirroring session
+     * for a change that costs nothing to apply in place.
+     */
+    private fun saveAndApplyLive(transform: (AppSettings) -> AppSettings) {
+        viewLifecycleOwner.lifecycleScope.launch {
+            settingsRepository.update(transform)
+            ServiceController.applySettings(requireContext())
+            Logger.i("Settings saved — applied to the running receivers")
+        }
+    }
+
     private fun saveAndRestart(transform: (AppSettings) -> AppSettings) {
         viewLifecycleOwner.lifecycleScope.launch {
             settingsRepository.update(transform)

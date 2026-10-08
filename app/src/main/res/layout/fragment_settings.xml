@@ -116,6 +116,11 @@
             android:layout_width="match_parent"
             android:layout_height="72dp" />
 
+        <include layout="@layout/settings_toggle_row"
+            android:id="@+id/row_video_url_mode"
+            android:layout_width="match_parent"
+            android:layout_height="72dp" />
+
         <!-- ── Section: Service ───────────────────────────────── -->
         <include layout="@layout/settings_section_header"
             android:id="@+id/header_service"

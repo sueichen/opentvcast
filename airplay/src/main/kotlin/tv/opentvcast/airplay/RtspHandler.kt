@@ -68,6 +68,12 @@ open class RtspHandler(
     private val onVideoStop: () -> Unit = {},
     /** Current URL-video playback snapshot for GET /playback-info and GET /scrub. */
     private val onPlaybackInfo: () -> tv.opentvcast.airplay.PlaybackInfo? = { null },
+
+    /**
+     * Whether video URL playback is permitted (FR-60). Read per request, so turning the
+     * setting off takes effect on the next `POST /play` without reconnecting.
+     */
+    private val urlModeEnabled: () -> Boolean = { true },
     /** Sender's DACP reverse-control identity from RTSP headers (DACP-ID + Active-Remote token). */
     private val onRemoteControlInfo: (dacpId: String?, activeRemote: String?) -> Unit = { _, _ -> },
     /** When true, require HomeKit-style SRP PIN pairing before streaming (gated by AppSettings). */
@@ -112,6 +118,7 @@ open class RtspHandler(
         onVideoScrub = onVideoScrub,
         onVideoStop = onVideoStop,
         onPlaybackInfo = onPlaybackInfo,
+        urlModeEnabled = urlModeEnabled,
     )
 
     // Volume/artwork/metadata: the remembered volume state lives in there now.

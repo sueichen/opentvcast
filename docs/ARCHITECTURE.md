@@ -208,9 +208,8 @@ Stated here rather than buried in a roadmap:
   device. The adapters around them are injected ports, so the logic around them
   is tested; the hardware is not.
 - Instrumented tests compile but do not run in CI.
-- **Two features are designed but not implemented**: portrait-panel mirroring and
-  the video-URL-mode switch. Both have design documents with the measured numbers,
-  the rejected alternatives and their validation gates — see
-  `docs/spec/REQUIREMENTS.md` §1.8, then
-  [`spec/FEATURE-mirror-orientation.md`](spec/FEATURE-mirror-orientation.md) and
-  [`spec/FEATURE-video-url-mode.md`](spec/FEATURE-video-url-mode.md).
+- **Portrait-panel mirroring is designed but not implemented**: the panel's physical
+  orientation is not yet a setting, so a vertical stream is pillarboxed on a rotated
+  panel. The design carries the measured numbers, the three candidate rendering
+  strategies and their validation gate — see `docs/spec/REQUIREMENTS.md` §1.8 and
+  [`spec/FEATURE-mirror-orientation.md`](spec/FEATURE-mirror-orientation.md).

@@ -75,4 +75,6 @@
 
     <!-- ── Waiting screen ──────────────────────────────────────── -->
 
+    <string name="setting_video_url_mode">Video-URL-Modus</string>
+    <string name="setting_video_url_mode_subtitle">Aus = nur spiegeln. Video-Apps melden dann, dass sie auf diesem Fernseher nicht abspielen können — stattdessen Bildschirmsynchronisierung starten</string>
 </resources>

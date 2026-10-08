@@ -101,4 +101,6 @@
     <string name="pairing_pin_title">AirPlay pairing code</string>
     <string name="pairing_pin_hint">Enter this code on your device to connect</string>
 
+    <string name="setting_video_url_mode">Video URL mode</string>
+    <string name="setting_video_url_mode_subtitle">Off = mirror only. Video apps will then report that they cannot play on this TV — start Screen Mirroring instead</string>
 </resources>

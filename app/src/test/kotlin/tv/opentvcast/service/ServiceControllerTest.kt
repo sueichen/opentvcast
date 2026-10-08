@@ -76,6 +76,19 @@ class ServiceControllerTest {
     }
 
     @Test
+    fun `applySettings() sends ACTION_APPLY_SETTINGS intent via startService`() {
+        // startService, not startForegroundService: applying a restart-free setting must
+        // not be the thing that spins the service up (or promote it to foreground).
+        val slot2 = slot<Intent>()
+        every { context.startService(capture(slot2)) } returns mockk()
+
+        ServiceController.applySettings(context)
+
+        verify { context.startService(any()) }
+        assertEquals(CastService.ACTION_APPLY_SETTINGS, slot2.captured.action)
+    }
+
+    @Test
     fun `start() intent targets CastService class`() {
         ServiceController.start(context)
 

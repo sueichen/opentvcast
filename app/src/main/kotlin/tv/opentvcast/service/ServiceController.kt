@@ -71,6 +71,21 @@ object ServiceController {
     }
 
     /**
+     * Tells the running receivers to re-read settings that do not need a restart.
+     *
+     * Unlike [restart], this leaves an in-progress session alone: the receivers apply the
+     * change in place (FR-60). If the service is not running this is a no-op, so the call
+     * site does not have to know its state.
+     *
+     * @param context Any valid Android context.
+     */
+    fun applySettings(context: Context) {
+        Logger.i("ServiceController: applySettings()")
+        val intent = buildIntent(context, CastService.ACTION_APPLY_SETTINGS)
+        context.startService(intent)
+    }
+
+    /**
      * Starts a foreground service using [Context.startForegroundService] on API 26+,
      * falling back to [Context.startService] on older versions.
      *

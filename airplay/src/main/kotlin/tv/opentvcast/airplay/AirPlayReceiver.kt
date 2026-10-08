@@ -59,6 +59,12 @@ class AirPlayReceiver(
     private val audioEnabled: Boolean = false,
     /** Require HomeKit-style SRP PIN pairing before streaming (AppSettings.airPlayPinAuthEnabled). */
     private val pinAuthEnabled: Boolean = false,
+
+    /**
+     * Whether AirPlay video URL playback is permitted (FR-60). Mirrors the "Video URL
+     * mode" setting; update it live through [setVideoUrlModeEnabled].
+     */
+    videoUrlModeEnabled: Boolean = true,
     /** Lazy Surface provider — called only for video streams when RECORD arrives. */
     private val videoSurfaceProvider: () -> Surface?,
     private val onStateChanged: (ProtocolState) -> Unit,
@@ -124,6 +130,9 @@ class AirPlayReceiver(
     @Volatile private var audioServer: AudioStreamServer? = null
     @Volatile private var bufferedAudioServer: BufferedAudioServer? = null
     @Volatile private var urlVideoPlayer: AirPlayVideoPlayer? = null
+
+    /** Live view of the "Video URL mode" setting; read per request by [RtspHandler]. */
+    @Volatile private var videoUrlModeEnabled: Boolean = videoUrlModeEnabled
 
     // Reverse remote control (TV → sender). Created lazily once a sender advertises DACP-ID.
     private val dacpClient = DacpClient(context)
@@ -247,6 +256,7 @@ class AirPlayReceiver(
             onVideoScrub = { pos -> urlVideoPlayer?.scrub(pos) },
             onVideoStop = { stopUrlVideo() },
             onPlaybackInfo = { urlVideoPlayer?.info() },
+            urlModeEnabled = { videoUrlModeEnabled },
             onRemoteControlInfo = { dacpId, activeRemote -> dacpClient.configure(dacpId, activeRemote) },
             pinAuthEnabled = pinAuthEnabled,
             pairingStore = pairingStore,
@@ -523,6 +533,23 @@ class AirPlayReceiver(
         ).also { urlVideoPlayer = it }
         player.play(url, startFraction)
         Logger.i("AirPlay URL video started: $url (start=$startFraction)")
+    }
+
+    /**
+     * Applies the "Video URL mode" setting without restarting the receiver (FR-60).
+     *
+     * Turning it off **while a URL is playing** stops that playback immediately: the
+     * user asked for mirroring only, and leaving the video running until the sender
+     * disconnects would be the opposite of what the switch says. The RTSP session
+     * survives, so the sender can start mirroring straight away.
+     */
+    fun setVideoUrlModeEnabled(enabled: Boolean) {
+        if (videoUrlModeEnabled == enabled) return
+        videoUrlModeEnabled = enabled
+        if (!enabled && urlVideoPlayer != null) {
+            Logger.i("Video URL mode disabled while playing — stopping URL playback")
+            stopUrlVideo()
+        }
     }
 
     /** Stops AirPlay video URL playback (POST /stop or end-of-media) and ends the session. */

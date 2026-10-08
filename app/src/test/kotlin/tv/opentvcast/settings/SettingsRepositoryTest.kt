@@ -36,6 +36,8 @@ class SettingsRepositoryTest {
         assertTrue(defaults.airPlayEnabled)
         assertTrue(defaults.dlnaEnabled)
         assertTrue(defaults.mirrorAudioEnabled)
+        assertTrue("URL mode ships on — an upgrade must not take the capability away",
+            defaults.videoUrlModeEnabled)
         assertFalse(defaults.airPlayPinAuthEnabled)
         assertFalse(defaults.startOnBoot)
 
@@ -50,6 +52,7 @@ class SettingsRepositoryTest {
                 showDebugOverlay = true,
                 forceHighResolution = true,
                 mirrorAudioEnabled = false,
+                videoUrlModeEnabled = false,
             )
         }
         val updated = repo.settingsFlow.first()
@@ -61,6 +64,13 @@ class SettingsRepositoryTest {
         assertTrue(updated.showDebugOverlay)
         assertTrue(updated.forceHighResolution)
         assertFalse(updated.mirrorAudioEnabled)
+        assertFalse(updated.videoUrlModeEnabled)
+
+        // A partial update that says nothing about video URL mode must leave it alone:
+        // a transform written for another setting cannot silently re-enable (or disable)
+        // a feature the user chose.
+        repo.update { it.copy(displayName = "Den TV") }
+        assertFalse(repo.settingsFlow.first().videoUrlModeEnabled)
 
         // 3. The derived properties follow the stored flag, not a copy.
         assertEquals(2560, updated.mirrorWidth)

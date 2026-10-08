@@ -82,7 +82,20 @@ data class AppSettings(
      * the whole mirror session down after a couple of seconds — so this defaults OFF to keep video
      * mirroring rock-solid. Turn on to experiment with audio.
      */
-    val mirrorAudioEnabled: Boolean = true
+    val mirrorAudioEnabled: Boolean = true,
+
+    /**
+     * Whether AirPlay **video URL playback** is allowed (FR-60).
+     *
+     * On (default): a sender app may hand the TV a URL and the TV plays the media
+     * itself. Off: the receiver refuses `POST /play` and mirrors only, so what appears
+     * on the TV is always the sender's screen.
+     *
+     * The wording of this setting must not promise that a sender will mirror instead —
+     * it will not; a video app that is refused usually reports that it cannot play on
+     * this TV, and the user has to start Screen Mirroring.
+     */
+    val videoUrlModeEnabled: Boolean = true
 ) {
 
     /** Advertised mirroring display size: 2560×1440 when [forceHighResolution], else 1920×1080. */

@@ -34,4 +34,11 @@ object CastServiceContract {
 
     /** Stops then starts all receivers (the service itself keeps running). */
     const val ACTION_RESTART = "tv.opentvcast.action.RESTART"
+
+    /**
+     * Pushes settings that can change without a restart into the running receivers
+     * (FR-60). Distinct from [ACTION_RESTART] on purpose: restarting drops an active
+     * session, which is the wrong price for a switch the protocol reads per request.
+     */
+    const val ACTION_APPLY_SETTINGS = "tv.opentvcast.action.APPLY_SETTINGS"
 }

@@ -30,10 +30,27 @@ internal class RtspVideoControl(
     private val onVideoScrub: (positionSec: Double) -> Unit,
     private val onVideoStop: () -> Unit,
     private val onPlaybackInfo: () -> PlaybackInfo?,
+    /**
+     * Whether URL playback is allowed at all — the "Video URL mode" setting (FR-60).
+     *
+     * A **callback rather than a Boolean on purpose**: the switch can be flipped while a
+     * session is open, and a value captured at construction would keep serving the old
+     * answer until the sender reconnected. Reading it per request also makes the
+     * mid-session case testable without a device.
+     */
+    private val urlModeEnabled: () -> Boolean = { true },
 ) {
 
     /** POST /play — a media URL to play (binary/XML plist or legacy text body). */
     fun play(request: RtspRequest): RtspResponse {
+        if (!urlModeEnabled()) {
+            // Refused, not ignored: answering 200 and starting nothing would leave the
+            // sender showing a "playing" state that the user cannot explain. The other
+            // verbs keep answering, so the refusal reads as one feature switched off
+            // rather than a dead session.
+            Logger.i("POST /play refused: video URL mode is disabled in settings (mirroring only)")
+            return RtspResponse(403, "Forbidden", protocol = request.responseProtocol())
+        }
         val (url, start) = parsePlayBody(request)
         if (url.isNullOrBlank()) {
             Logger.w("POST /play with no Content-Location")

@@ -151,6 +151,7 @@ class CastService : Service() {
             ACTION_START   -> serviceScope.launch { startReceivers() }
             ACTION_STOP    -> serviceScope.launch { stopReceivers(); stopSelf() }
             ACTION_RESTART -> serviceScope.launch { restartReceivers() }
+            ACTION_APPLY_SETTINGS -> serviceScope.launch { applyLiveSettings() }
             else           -> serviceScope.launch { startReceivers() } // default: start
         }
 
@@ -241,6 +242,20 @@ class CastService : Service() {
      * Restarts all receivers: stops them, waits briefly, then starts them again.
      * Used for applying settings changes or recovering from errors.
      */
+    /**
+     * Applies settings that can change without restarting the receivers (FR-60).
+     *
+     * So far only one qualifies — the video-URL-mode switch — and it qualifies because the
+     * RTSP handler reads it per request: pushing the new value keeps an open session (and
+     * any mirror the user is watching) alive. Settings the receivers read once at startup
+     * still go through [restartReceivers].
+     */
+    private suspend fun applyLiveSettings() {
+        val settings = settingsRepository.settingsFlow.first()
+        airPlayReceiver?.setVideoUrlModeEnabled(settings.videoUrlModeEnabled)
+        Logger.i("Live settings applied: videoUrlModeEnabled=${settings.videoUrlModeEnabled}")
+    }
+
     private suspend fun restartReceivers() {
         Logger.i("Restarting all receivers")
         _serviceState.value = ServiceState.Restarting
@@ -310,6 +325,7 @@ class CastService : Service() {
             mirrorHeight = settings.mirrorHeight,
             audioEnabled = settings.mirrorAudioEnabled,
             pinAuthEnabled = settings.airPlayPinAuthEnabled,
+            videoUrlModeEnabled = settings.videoUrlModeEnabled,
             // Delegate to the current provider at call time — captures the field, not a fixed value.
             // When MainActivity calls setVideoSurfaceProvider(), future surface requests use it.
             videoSurfaceProvider = { videoSurfaceProvider?.invoke() },
@@ -532,6 +548,9 @@ class CastService : Service() {
         const val ACTION_START    = CastServiceContract.ACTION_START
         const val ACTION_STOP     = CastServiceContract.ACTION_STOP
         const val ACTION_RESTART  = CastServiceContract.ACTION_RESTART
+
+        /** Pushes restart-free settings changes into the running receivers (FR-60). */
+        const val ACTION_APPLY_SETTINGS = CastServiceContract.ACTION_APPLY_SETTINGS
 
         /**
          * Multicast-lock owner tag for AirPlay's advertising.

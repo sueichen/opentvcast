@@ -15,6 +15,12 @@ reproduced here.
 
 ### Added
 
+- **Video URL mode switch** (AirPlay): the receiver can be made mirroring-only, so a
+  sender's URL is never fetched and played by the TV itself. `POST /play` is refused
+  with 403, an in-flight URL playback stops at once, and the other transport verbs
+  keep answering so the session survives. Applied live — no service restart. Default
+  is on, so the capability is opt-out. Verified on an Android 14 TV emulator.
+
 - **DLNA / UPnP AV MediaRenderer** (`:dlna`): SSDP discovery and announcements, device
   description and SCPDs served on an allocated port, `AVTransport` / `RenderingControl` /
   `ConnectionManager` over SOAP, and GENA eventing with `LastChange`. Enabled by the

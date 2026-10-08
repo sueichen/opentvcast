@@ -40,4 +40,6 @@
     <string name="setting_dlna_enabled">Récepteur DLNA</string>
     <string name="setting_reset_defaults">Réinitialiser les paramètres</string>
 
+    <string name="setting_video_url_mode">Mode URL vidéo</string>
+    <string name="setting_video_url_mode_subtitle">Désactivé = miroir uniquement. Les applis vidéo indiqueront qu\'elles ne peuvent pas lire sur ce téléviseur — lancez la recopie d\'écran</string>
 </resources>
