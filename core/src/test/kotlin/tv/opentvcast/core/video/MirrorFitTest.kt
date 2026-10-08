@@ -150,4 +150,27 @@ class MirrorFitTest {
             assert(box.heightPx >= 1) { "$vw x $vh produced height ${box.heightPx}" }
         }
     }
+
+    // ─── no size to work from ──────────────────────────────────────────────────
+
+    @Test
+    fun `without a video size the box is the container, transposed when rotated`() {
+        // URL playback never reports a size worth trusting (MediaPlayer called a 16:9 stream
+        // 540x540), so the framing has to come from geometry alone. A container-sized box must NOT
+        // be used while rotated: it rotates into an area larger than the window and gets clipped.
+        assertEquals(FitBox(panelW, panelH), MirrorFit.fallbackBoxFor(panelW, panelH, 0))
+        assertEquals(FitBox(panelH, panelW), MirrorFit.fallbackBoxFor(panelW, panelH, 90))
+        assertEquals(FitBox(panelH, panelW), MirrorFit.fallbackBoxFor(panelW, panelH, 270))
+    }
+
+    @Test
+    fun `an unmeasured container yields no fallback either`() {
+        assertNull(MirrorFit.fallbackBoxFor(0, panelH, 90))
+        assertNull(MirrorFit.fallbackBoxFor(panelW, 0, 90))
+    }
+
+    @Test
+    fun `an unrecognised rotation behaves like no rotation, as in boxFor`() {
+        assertEquals(FitBox(panelW, panelH), MirrorFit.fallbackBoxFor(panelW, panelH, 45))
+    }
 }

@@ -251,7 +251,7 @@ class AirPlayReceiver(
             onArtwork = { bytes ->
                 onNowPlayingChanged(nowPlaying.onArtwork(bytes))
             },
-            onVideoPlay = { url, start -> startUrlVideo(url, start) },
+            onVideoPlay = { url, start, referer -> startUrlVideo(url, start, referer) },
             onVideoRate = { rate -> urlVideoPlayer?.setRate(rate) },
             onVideoScrub = { pos -> urlVideoPlayer?.scrub(pos) },
             onVideoStop = { stopUrlVideo() },
@@ -523,16 +523,30 @@ class AirPlayReceiver(
     /**
      * AirPlay video URL mode (non-mirroring): show the streaming surface and hand the URL to
      * [AirPlayVideoPlayer], which fetches + plays it via MediaPlayer onto the same Surface.
+     *
+     * Mirroring is stopped first. Both producers write to the *same* Surface, and a sender that
+     * hands over a video has normally torn its mirror streams down already — this makes the
+     * exclusion true even when it has not, instead of leaving two writers racing for one buffer.
+     * [referer] is the sender's `Referer` for the media request, when it supplied one.
      */
-    private fun startUrlVideo(url: String, startFraction: Double) {
+    private fun startUrlVideo(url: String, startFraction: Double, referer: String?) {
+        if (mirrorServer != null) {
+            Logger.i("URL playback requested — stopping the mirror video stream (one Surface, one producer)")
+            stopMirrorVideo()
+        }
+        if (audioServer != null) {
+            Logger.i("URL playback requested — stopping the mirror audio stream")
+            stopMirrorAudio()
+        }
         onSenderNameChanged("AirPlay")
         emitState(ProtocolState.CONNECTED)   // shows StreamingScreen → Surface becomes available
         val player = urlVideoPlayer ?: AirPlayVideoPlayer(
+            context = context,
             surfaceProvider = videoSurfaceProvider,
             onEnded = { stopUrlVideo() }
         ).also { urlVideoPlayer = it }
-        player.play(url, startFraction)
-        Logger.i("AirPlay URL video started: $url (start=$startFraction)")
+        player.play(url, startFraction, referer)
+        Logger.i("AirPlay URL video started: $url (start=$startFraction, referer=${referer ?: "none"})")
     }
 
     /**

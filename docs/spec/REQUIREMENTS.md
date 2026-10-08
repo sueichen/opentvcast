@@ -17,7 +17,9 @@ opentvcast v1 ships exactly **two** protocols:
 | **DLNA / UPnP AV MediaRenderer** | Implemented, not verified on hardware (§1.3) |
 
 Mirror display orientation and the video-URL-mode switch are **implemented**
-(§1.8, FR-58…FR-61). Neither has been exercised against a real sender.
+(§1.8, FR-58…FR-62). Both have now been exercised against a real sender (iPhone, Android TV,
+2026-10-08): mirroring, audio and in-app video URL playback work; that test also found and fixed
+three silent defects in URL playback and one in the rotated-panel display path — see §1.8.
 
 **Miracast and Google Cast are not in v1, and this is a decision rather than a
 backlog item:**
@@ -180,10 +182,13 @@ it has been exercised against a real control point, so treat FR-37 as unproven.
 
 ### 1.8 Display orientation and playback source
 
-**Status: implemented.** Both features are in the tree; the design documents carry
-the measured numbers, the rejected alternatives and what remains unverified. In short:
-rotating the *display* is refused by Android TV, so the picture is rotated inside the
-app's own window — no permission, and undone when the app exits.
+**Status: implemented, first hardware test done (2026-10-08).** Both features are in the tree; the
+design documents carry the measured numbers, the rejected alternatives and what remains unverified.
+In short: rotating the *display* is refused by Android TV, so the picture is rotated inside the app's
+own window — no permission, and undone when the app exits. That test also found a defect this section
+now records rather than hides: the rotation was applied to a `SurfaceView`, whose content cannot be
+transformed, so the picture did not turn. It is carried by a `TextureView` whenever the panel is
+rotated, and the fix still needs a re-test on hardware.
 
 - [`FEATURE-mirror-orientation.md`](FEATURE-mirror-orientation.md) — portrait-mounted
   panels, rotation-aware framing
@@ -193,7 +198,9 @@ app's own window — no permission, and undone when the app exits.
   landscape (default) or rotated 90°. In the rotated case the mirroring picture is rotated
   so it reads upright and is not cropped. Implemented by rotating the video inside the app's
   own window: Android TV refuses an application's display-orientation request (measured), and
-  the system-wide rotation setting needs `WRITE_SETTINGS` and would outlive the app.
+  the system-wide rotation setting needs `WRITE_SETTINGS` and would outlive the app. The
+  rotated picture is carried by a `TextureView`, because a `SurfaceView`'s content cannot be
+  transformed (measured on hardware); a landscape panel keeps the `SurfaceView`.
 - FR-59: **Implemented.** The rotation direction is selectable (left = 90°,
   right = 270°), since which is correct depends on how the panel was turned.
 - FR-60: **Implemented.** The user can disable AirPlay **video URL playback**, so
@@ -204,7 +211,16 @@ app's own window — no permission, and undone when the app exits.
   with 403 and never reaches the player, while mirroring, mirroring audio, photos
   and DACP continue to work unchanged. The transport verbs keep answering, so a
   refusal reads as one feature switched off rather than a dead session. Verified on
-  an Android 14 TV emulator: 200 with the switch on, 403 with it off.
+  an Android 14 TV emulator: 200 with the switch on, 403 with it off. A refusal is
+  also not a recovery: a sender that has already stopped mirroring stays silent, and
+  the setting's own text says so.
+- FR-62: **Implemented.** Media at a URL supplied by a sender or a control point MUST be
+  fetchable: the receiver MUST permit **cleartext HTTP** for those fetches and MUST forward the
+  `Referer` a sender supplies in the `/play` body. This is a configuration and parsing
+  requirement rather than a feature, because the failure it prevents is invisible in every
+  other test: Android blocks cleartext from target SDK 28 on, so without it every `http://`
+  URL dies inside `MediaPlayer` and the user sees a black screen. DLNA is covered by the same
+  requirement — a control point's `SetAVTransportURI` URL is usually plain http on a LAN.
 
 ---
 

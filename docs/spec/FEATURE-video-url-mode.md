@@ -10,6 +10,49 @@ and `/stop` keep answering `200` so the session stays coherent. Toggling the swi
 applied live — `Live settings applied: videoUrlModeEnabled=false` — with no restart
 and no session teardown.
 
+## Real-device result (2026-10-08, iPhone + Android TV)
+
+The first real-hardware test split the URL path in two: **native apps work, web pages do not.**
+
+| Case | Result |
+|---|---|
+| Tencent Video / Bilibili, in-app AirPlay, URL mode **on** | plays correctly |
+| A video played **full-screen in a browser** | **black screen with URL mode on *and* off** |
+
+The second row is the informative one. "Black either way" looks like a broken switch; it is not.
+It means the sender had already **stopped mirroring** and handed the media over — the browser does
+that when a web video goes full-screen — so with URL mode on this receiver has to play a URL and
+with it off it has nothing to play. Both outcomes are the same colour, from opposite causes. This
+is the situation §2's subtitle wording exists for.
+
+Three defects on this side came out of it, all fixed (none of them HLS):
+
+- **The sender's `Referer` was dropped.** It travels in the `/play` body; a page's CDN commonly
+  requires it while a native app's link does not, which is what "apps work, web video is black"
+  looks like from the outside. `RtspVideoControl` now parses it (case-insensitively; `Content-Location`
+  stays exact) and `AirPlayVideoPlayer` forwards it via the `Context` overload of `setDataSource`.
+- **Cleartext HTTP was blocked.** Target SDK 35 with no `networkSecurityConfig` means Android refuses
+  every `http://` request the app makes — and Apple's own `/play` example URL is `http://…`, and a
+  DLNA control point's `SetAVTransportURI` almost always is too. The failure was an `IOException` in a
+  log nobody reads. Fixed by `res/xml/network_security_config.xml`; **the same defect would have made
+  DLNA playback fail on any real control point**, which is why the fix is worth more than this feature.
+- **Mirroring was not stopped before URL playback.** Both producers write to the same `Surface`, so a
+  sender that hands over a video *without* tearing its mirror down would have had two writers racing
+  for one buffer. `startUrlVideo()` now stops the mirror streams first.
+
+Also added: the player retries the first `Surface` for ~2 s. The streaming overlay is created when the
+session connects, and a `MediaPlayer` that prepares without a surface plays sound and shows nothing —
+the mirroring path has always polled for its surface, and this now matches.
+
+**Still open.** `AirPlayVideoPlayer` is the platform `MediaPlayer`, and the project's requirements put
+**HLS down as deferred to v2** — yet `AppleIdentity` advertises an Apple TV's full feature mask, which
+includes the HLS flag a sender reads before deciding how to deliver the video. A web video delivered as
+HLS (fMP4/CMAF in particular) is therefore not playable here, and the refusal looks exactly like the
+rows above. Distinguishing that from the three defects fixed here needs one capture from the affected
+device: the `POST /play` line (URL scheme and extension) and what follows it (`prepared dur=`,
+`error what=`, `setup failed`). If `POST /play` never arrives, the sender never handed the video over
+and nothing on this side can fix the black screen.
+
 Adds a setting that turns off AirPlay **video URL playback**, so that a sender's
 video is never fetched and played by the TV itself. With the switch off, the
 receiver is a mirroring-only device.

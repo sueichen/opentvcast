@@ -25,7 +25,11 @@ import tv.opentvcast.util.Logger
  * Stateless: the player is reached only through the four callbacks.
  */
 internal class RtspVideoControl(
-    private val onVideoPlay: (url: String, startFraction: Double) -> Unit,
+    /**
+     * Starts playback of [url]. [referer] is whatever the sender supplied in the `/play` body —
+     * see [parsePlayBody] — and is null when it supplied none.
+     */
+    private val onVideoPlay: (url: String, startFraction: Double, referer: String?) -> Unit,
     private val onVideoRate: (rate: Float) -> Unit,
     private val onVideoScrub: (positionSec: Double) -> Unit,
     private val onVideoStop: () -> Unit,
@@ -51,13 +55,14 @@ internal class RtspVideoControl(
             Logger.i("POST /play refused: video URL mode is disabled in settings (mirroring only)")
             return RtspResponse(403, "Forbidden", protocol = request.responseProtocol())
         }
-        val (url, start) = parsePlayBody(request)
+        val parsed = parsePlayBody(request)
+        val url = parsed.url
         if (url.isNullOrBlank()) {
             Logger.w("POST /play with no Content-Location")
             return RtspResponse(400, "Bad Request", protocol = request.responseProtocol())
         }
-        Logger.i("POST /play url=$url start=$start")
-        onVideoPlay(url, start)
+        Logger.i("POST /play url=$url start=${parsed.startFraction} referer=${parsed.referer ?: "none"}")
+        onVideoPlay(url, parsed.startFraction, parsed.referer)
         return RtspResponse(200, "OK", protocol = request.responseProtocol())
     }
 
@@ -129,27 +134,51 @@ internal class RtspVideoControl(
 
     companion object {
 
-        /** Extracts the media URL + start fraction from a /play body (plist or legacy text). */
-        internal fun parsePlayBody(request: RtspRequest): Pair<String?, Double> {
+        /**
+         * Extracts the media URL + start fraction from a /play body (plist or legacy text).
+         *
+         * `Referer` is read too, and matters: a video handed over by a **web page** is usually
+         * served by a CDN that refuses requests without it, while a native app's in-app AirPlay
+         * link usually does not care. Ignoring the field therefore looks exactly like "Apps work,
+         * web video shows a black screen" — the failure this sweep was opened by. Senders that
+         * supply nothing are unaffected (`referer == null`).
+         *
+         * Keys are matched case-insensitively for `Referer` only: `Content-Location` is Apple's own
+         * key and is matched exactly, while `Referer` is outside Apple's plist contract and is seen
+         * spelled both ways in the wild.
+         */
+        internal fun parsePlayBody(request: RtspRequest): PlayRequest {
             if (request.isPlistBody()) {
                 val p = runCatching { PlistCodec.decode(request.bodyBytes) }.getOrNull()
-                    ?: return null to 0.0
-                val url = p["Content-Location"] as? String
-                val start = (p["Start-Position"] as? Double) ?: 0.0
-                return url to start
+                    ?: return PlayRequest(null, 0.0, null)
+                // Field NAMES at info level: the values can be large or sensitive, but which fields a
+                // sender actually sends is exactly what is needed when a URL playback misbehaves.
+                Logger.i("POST /play plist fields: ${p.keys.sorted()}")
+                return PlayRequest(
+                    url = p["Content-Location"] as? String,
+                    startFraction = (p["Start-Position"] as? Double) ?: 0.0,
+                    referer = p.valueFor("Referer"),
+                )
             }
             // Legacy text body: "Content-Location: <url>\r\nStart-Position: <float>\r\n"
             var url: String? = null
             var start = 0.0
+            var referer: String? = null
             request.body.lineSequence().forEach { line ->
                 when {
                     line.startsWith("Content-Location:", true) -> url = line.substringAfter(":").trim()
+                    line.startsWith("Referer:", true) -> referer = line.substringAfter(":").trim()
                     line.startsWith("Start-Position:", true) ->
                         start = line.substringAfter(":").trim().toDoubleOrNull() ?: 0.0
                 }
             }
-            return url to start
+            return PlayRequest(url, start, referer?.ifBlank { null })
         }
+
+        /** Case-insensitive lookup of a plist string field. */
+        private fun Map<String, Any?>.valueFor(key: String): String? =
+            entries.firstOrNull { it.key.equals(key, ignoreCase = true) }
+                ?.value as? String
 
         /** Extracts a query-string parameter (`?k=v&...`) from a request URI. */
         internal fun queryParam(uri: String, key: String): String? =
@@ -158,3 +187,10 @@ internal class RtspVideoControl(
                 ?.substringAfter('=', "")
     }
 }
+
+/** A parsed `POST /play` body: what to play, where to start, and the sender's `Referer` if any. */
+internal data class PlayRequest(
+    val url: String?,
+    val startFraction: Double,
+    val referer: String?,
+)

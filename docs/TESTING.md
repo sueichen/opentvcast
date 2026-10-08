@@ -47,18 +47,21 @@ artifacts.
 
 | Tier | Task | Classes | Tests | Notes |
 |---|---|---|---|---|
-| `:core` | `:core:test` | 16 | 181 | Plain JUnit. Fastest meaningful gate. |
+| `:core` | `:core:test` | 16 | 184 | Plain JUnit. Fastest meaningful gate. |
 | `:platform` | `:platform:testDebugUnitTest` | 6 | 46 | Android helpers. Mostly plain JUnit — Robolectric only where a real `Context` is unavoidable. |
-| `:airplay` | `:airplay:testDebugUnitTest` | 38 | 332 | **Must live here**: many tests drive `internal` members, which do not cross a module boundary. |
-| `:dlna` | `:dlna:testDebugUnitTest` | 11 | 98 | UPnP protocol logic **plus** its sockets and receiver lifecycle over loopback (§7): SSDP, documents, SOAP, routing, GENA, HTTP server, receiver start/stop. |
-| `:app` | `:app:testGoogletvDebugUnitTest` (and `…Firetv…`) | 9 | 78 | UI, service, settings, Android adapters. Both flavours run the same suite. |
+| `:airplay` | `:airplay:testDebugUnitTest` | 39 | 339 | **Must live here**: many tests drive `internal` members, which do not cross a module boundary. |
+| `:dlna` | `:dlna:testDebugUnitTest` | 11 | 99 | UPnP protocol logic **plus** its sockets and receiver lifecycle over loopback (§7): SSDP, documents, SOAP, routing, GENA, HTTP server, receiver start/stop. |
+| `:app` | `:app:testGoogletvDebugUnitTest` (and `…Firetv…`) | 10 | 82 | UI, service, settings, Android adapters. Both flavours run the same suite. |
 | `:test-runner` | `:test-runner:test` | *aggregate* | *superset* | JVM-only aggregated build — see §3. |
 | instrumented | `:app:assembleGoogletvDebugAndroidTest` | 1 | compile only | **Compile gate**, not execution — no emulator in CI. |
 
-Module-native, deduplicated total: **736** (core 181, platform 46, airplay 332,
-dlna 99, app 78). The rise from 703 is two features landing — portrait-panel rotation and
+Module-native, deduplicated total: **750** (core 184, platform 46, airplay 339,
+dlna 99, app 82). The rise from 703 was two features landing — portrait-panel rotation and
 the video-URL-mode switch — including one view-level test (`StreamingScreenTest`, in `:app`
-because it needs Robolectric) that covers wiring the pure `MirrorFit` tests cannot reach. The aggregate runner's number is a superset and deliberately not
+because it needs Robolectric) that covers wiring the pure `MirrorFit` tests cannot reach. The
+last 14 came from a real-device test round: the sender's `Referer`, the cleartext network
+policy, the no-size framing fallback, and the assertion that the `SurfaceView` is never asked
+to rotate (it cannot). The aggregate runner's number is a superset and deliberately not
 part of that count.
 
 Treat these counts as a map of coverage, not a target: they will drift with

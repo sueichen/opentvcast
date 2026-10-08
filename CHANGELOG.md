@@ -18,10 +18,14 @@ reproduced here.
 - **Portrait TV** (AirPlay mirroring): for a panel that has been rotated 90° by hand. The
   mirrored picture is rotated 90° or 270° and refitted so vertical video fills the panel's
   long edge with only narrow side bars, instead of sitting pillarboxed in the middle of a
-  landscape frame. Applied live, needs no permission, and is undone when the app exits —
-  the TV's own settings are never touched. Android TV refuses an application's
+  landscape frame. The picture is carried by a `TextureView` while the panel is rotated —
+  a `SurfaceView` composites its own surface and silently ignores `rotation` (measured on
+  real hardware), so the ordinary landscape case keeps the SurfaceView and only the rotated
+  one pays for the extra GPU copy. Applied live, needs no permission, and is undone when the
+  app exits — the TV's own settings are never touched. Android TV refuses an application's
   display-orientation request (measured), so the rotation happens inside the app's window.
-  The framing arithmetic is unit-tested; correct pixels on a real sender are not yet verified.
+  The framing arithmetic and the view/rotation wiring are unit-tested; the pixels on a
+  rotated panel still need real hardware.
 
 - **Video URL mode switch** (AirPlay): the receiver can be made mirroring-only, so a
   sender's URL is never fetched and played by the TV itself. `POST /play` is refused
@@ -67,6 +71,28 @@ reproduced here.
 
 ### Fixed
 
+- **Media at a URL the sender supplies is now fetched the way the sender intended.** Two
+  silent faults stopped AirPlay URL playback dead. The sender's `Referer`, which travels in
+  the `/play` body and is required by a web page's CDN while a native app's in-app link
+  usually does not care, was parsed and then thrown away. And **cleartext HTTP was blocked**:
+  with no `networkSecurityConfig`, Android refuses every `http://` request the app makes —
+  which is the shape of Apple's own `/play` example URL and of what a DLNA control point
+  sends in `SetAVTransportURI`. Both failures surfaced as a black screen and one line in a
+  log nobody reads. **The same defect would have stopped DLNA playback from working against
+  any real control point.** URL playback now also stops a running mirror first (one Surface,
+  one writer) and retries the first Surface for about two seconds, since a `MediaPlayer` that
+  prepares without a surface plays sound and shows nothing.
+- **Portrait TV rotates the picture only on a view that can carry the rotation.** The first
+  implementation set `rotation` on a `SurfaceView`, which accepts the property and leaves the
+  picture where it was — a real TV showed a portrait stream with its long edge along the
+  panel's short edge. The picture is now carried by a `TextureView` whenever the panel is
+  rotated, and by the (zero-copy) `SurfaceView` otherwise.
+- **A URL video is framed by geometry, not by what `MediaPlayer` claims its size is.** While the
+  panel is rotated and the size is unknown — which is every URL playback — the surface is laid out
+  as the container *transposed*, so the rotation turns a complete picture into place instead of
+  producing a zoomed, clipped one. `MediaPlayer`'s own size report was tried as an input and
+  measured wrong (a 16:9 stream announced as 540×540); it already letterboxes correctly inside the
+  surface it is given, so it is left to do that.
 - Remote DoS: a flood of blank lines in the RTSP request stream recursed and
   overflowed the session thread's stack. The skip is now iterative.
 - Audio crashes were misclassified: a UDP bind failure was logged as expected

@@ -59,7 +59,7 @@ open class RtspHandler(
     /** Album artwork (JPEG/PNG bytes) from SET_PARAMETER; empty bytes = artwork cleared. */
     private val onArtwork: (ByteArray) -> Unit = {},
     /** AirPlay video URL mode: POST /play with a media URL + start fraction (0..1). */
-    private val onVideoPlay: (url: String, startFraction: Double) -> Unit = { _, _ -> },
+    private val onVideoPlay: (url: String, startFraction: Double, referer: String?) -> Unit = { _, _, _ -> },
     /** AirPlay video transport: POST /rate (≤0 pause, >0 resume). */
     private val onVideoRate: (rate: Float) -> Unit = {},
     /** AirPlay video transport: POST /scrub — seek to position (seconds). */

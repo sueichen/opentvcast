@@ -25,7 +25,8 @@ import org.junit.Test
 class RtspVideoControlTest {
 
     private class Harness(urlModeEnabled: Boolean = true, gate: (() -> Boolean)? = null) {
-        val played = mutableListOf<Pair<String, Double>>()
+        /** url, start fraction, sender's Referer (null when it sent none). */
+        val played = mutableListOf<Triple<String, Double, String?>>()
         val rates = mutableListOf<Float>()
         val scrubs = mutableListOf<Double>()
         var stops = 0
@@ -34,7 +35,7 @@ class RtspVideoControlTest {
         )
 
         val control = RtspVideoControl(
-            onVideoPlay = { url, start -> played.add(url to start) },
+            onVideoPlay = { url, start, referer -> played.add(Triple(url, start, referer)) },
             onVideoRate = { rates.add(it) },
             onVideoScrub = { scrubs.add(it) },
             onVideoStop = { stops++ },
@@ -63,7 +64,7 @@ class RtspVideoControlTest {
         )
 
         assertEquals(200, response.statusCode)
-        assertEquals(listOf("http://example.com/movie.m3u8" to 0.25), h.played)
+        assertEquals(listOf(Triple("http://example.com/movie.m3u8", 0.25, null)), h.played)
     }
 
     @Test
@@ -74,7 +75,7 @@ class RtspVideoControlTest {
         )
 
         assertEquals(200, response.statusCode)
-        assertEquals(listOf("http://example.com/v.mp4" to 0.5), h.played)
+        assertEquals(listOf(Triple("http://example.com/v.mp4", 0.5, null)), h.played)
     }
 
     @Test
@@ -84,6 +85,63 @@ class RtspVideoControlTest {
 
         assertEquals(400, response.statusCode)
         assertTrue(h.played.isEmpty())
+    }
+
+    // ─── Referer: the field that separates a web video from a native app ──────
+
+    @Test
+    fun `play forwards the plist Referer a web video's CDN requires`() {
+        // The field a web page's CDN checks and a native app's in-app link usually does not —
+        // which is exactly what "apps work, web video shows black" looks like when it is dropped.
+        val h = Harness()
+        val bodyBytes = PlistCodec.encode(
+            mapOf(
+                "Content-Location" to "https://cdn.example.com/v.mp4",
+                "Referer" to "https://example.com/watch/123",
+                "Start-Position" to 0.0,
+            )
+        )
+
+        assertEquals(200, h.control.play(RtspRequest("POST", "/play", emptyMap(), "", bodyBytes)).statusCode)
+        assertEquals(
+            listOf(Triple("https://cdn.example.com/v.mp4", 0.0, "https://example.com/watch/123")),
+            h.played,
+        )
+    }
+
+    @Test
+    fun `play matches the Referer field whatever case the sender used`() {
+        // `Content-Location` is Apple's own key and is matched exactly; `Referer` is not part of
+        // Apple's plist contract, so it is matched leniently.
+        val h = Harness()
+        val bodyBytes = PlistCodec.encode(
+            mapOf("Content-Location" to "https://cdn.example.com/v.mp4", "referer" to "https://example.com/")
+        )
+
+        h.control.play(RtspRequest("POST", "/play", emptyMap(), "", bodyBytes))
+
+        assertEquals("https://example.com/", h.played.single().third)
+    }
+
+    @Test
+    fun `play with no Referer forwards none rather than an empty one`() {
+        val h = Harness()
+        val bodyBytes = PlistCodec.encode(mapOf("Content-Location" to "https://cdn.example.com/v.mp4"))
+
+        h.control.play(RtspRequest("POST", "/play", emptyMap(), "", bodyBytes))
+
+        assertEquals(null, h.played.single().third)
+    }
+
+    @Test
+    fun `legacy text body carries the Referer too`() {
+        val h = Harness()
+        val body = "Content-Location: http://example.com/v.mp4\r\n" +
+            "Referer: http://example.com/page\r\nStart-Position: 0.0\r\n"
+
+        h.control.play(request("POST", "/play", body))
+
+        assertEquals(Triple("http://example.com/v.mp4", 0.0, "http://example.com/page"), h.played.single())
     }
 
     // ─── Video URL mode disabled by settings (FR-60, FR-61) ───────────────────
@@ -107,7 +165,7 @@ class RtspVideoControlTest {
         val response = h.control.play(RtspRequest("POST", "/play", emptyMap(), "", bodyBytes))
 
         assertEquals(200, response.statusCode)
-        assertEquals(listOf("http://example.com/movie.m3u8" to 0.0), h.played)
+        assertEquals(listOf(Triple("http://example.com/movie.m3u8", 0.0, null)), h.played)
     }
 
     @Test

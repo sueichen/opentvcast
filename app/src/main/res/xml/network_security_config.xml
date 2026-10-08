@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Cleartext HTTP is permitted deliberately, and this is the only place that says so.
+
+  The receiver plays media at URLs it did not choose. An AirPlay sender hands one over in the
+  `/play` body — Apple's own example there is `http://192.168.1.18:3689/airplay.mp4` — and a DLNA
+  control point sends one in `SetAVTransportURI`, which on a LAN is almost always plain
+  `http://192.168.x.x/…`. Android blocks cleartext by default for any app targeting API 28 or
+  higher, so without this file those URLs fail inside MediaPlayer with an IOException that reaches
+  the user as a black screen and nothing else.
+
+  The hosts cannot be listed: they are whatever the sender or the control point names. Nothing
+  secret is sent over these requests — the media fetch carries only what the sender itself
+  supplied (today, a `Referer`) — and the surrounding protocols are unauthenticated LAN casting
+  anyway, so permitting cleartext here restores the behaviour of the platform rather than lowering
+  the bar for anything that was previously protected.
+-->
+<network-security-config xmlns:tools="http://schemas.android.com/tools">
+    <!--
+      tools:ignore is scoped to this one element on purpose. The alternative — disabling
+      InsecureBaseConfiguration project-wide — would also hide the check everywhere it is right.
+      If this exception is ever removed, FR-62 and MediaNetworkPolicyTest fail with it.
+    -->
+    <base-config
+        cleartextTrafficPermitted="true"
+        tools:ignore="InsecureBaseConfiguration">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

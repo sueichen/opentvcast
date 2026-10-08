@@ -18,11 +18,30 @@ and is exactly what "don't touch my TV" forbids. The implementation therefore ro
 **picture inside the app's own window** — the design's S1 — which needs no permission and is
 undone the moment the app exits.
 
-What is verified where: the framing arithmetic is unit-tested against §3.3's numbers
-(`MirrorFitTest`), and the wiring was confirmed on the emulator (`Panel orientation published:
-PORTRAIT/LEFT` → `StreamingScreen: picture rotated 90°` 150 ms later). **The pixels — a real
-portrait stream filling the panel's long edge — still need a sender**, which the emulator
-cannot provide.
+**A second gate then changed it again — and this one came from real hardware.** Rotating the picture
+needs a view type that can carry a transform, and the first implementation rotated a `SurfaceView`,
+which silently cannot:
+
+| Probe (real Android TV, iPhone sender, 2026-10-08) | Result |
+|---|---|
+| `SurfaceView.rotation = 90°` with the transposed box applied | the box was applied and **the picture was not rotated**: the phone's long edge ran along the panel's *short* edge, with the content upright in the phone's own frame |
+
+A `SurfaceView` composites its own surface in SurfaceFlinger, so `rotation` moves the *hole* the view
+punches in the window and leaves the decoded picture inside it alone — "Because a SurfaceView's
+content does not live in the application's window, it cannot be transformed (moved, scaled, rotated)
+efficiently" (Android graphics). A `TextureView` draws through the view hierarchy and does honour it.
+
+So the picture is now carried by **two views, exactly one of them visible**: the `SurfaceView` on a
+landscape panel (the default, and the case that already worked — still zero-copy) and the
+`TextureView` when the panel is rotated. Switching changes which `Surface` the decoder writes to,
+which `MirrorStreamServer` already handles by rebuilding the decoder on its next frame.
+
+What is verified where: the framing arithmetic is unit-tested against §3.3's numbers (`MirrorFitTest`);
+the *view selection and rotation* are unit-tested (`StreamingScreenTest` — which view is active, what
+box and angle it gets, and that the `SurfaceView` is never asked to rotate); the emulator confirms the
+`TextureView`'s surface is created and that the switch is applied live. **The pixels on a rotated panel
+still need the user's hardware** — and that is precisely the check that failed above, so it is not a
+formality.
 
 Turns a portrait-mounted TV into a first-class configuration instead of an
 accident: the mirroring picture is rotated 90°, so vertical short-form video fills
@@ -33,9 +52,9 @@ middle of a landscape frame.
 
 ## 1. The problem, measured
 
-Mirroring is drawn by `app/ui/StreamingScreen.kt` → `applyAspectFit()`, which sizes
-the `SurfaceView` to the decoded video's aspect ratio and centres it (contain, no
-cropping) on a black background. The view is never rotated.
+Mirroring is drawn by `app/ui/StreamingScreen.kt` → `applyAspectFit()`, which sizes the
+video view to the decoded video's aspect ratio and centres it (contain, no
+cropping) on a black background. Nothing is ever rotated.
 
 On a 1920×1080 panel a portrait phone stream (1080×1920) is therefore rendered at
 **607×1080** — 657 px of black, split between the two sides, i.e. **34 % of the
@@ -100,8 +119,28 @@ Row 2 is the case from the request: a vertical short-form video now fills the
 panel's long edge with only narrow side bars, instead of 34 % of the width being
 wasted.
 
-## 4. The fit mathematics
+### 3.4 When there is no video size to fit (URL playback)
 
+Mirroring always knows its size: `StreamStats` is fed from the stream's SPS. **URL playback does
+not, and cannot be asked.** `MediaPlayer` renders a sender's URL to the same surface, and it
+letterboxes correctly inside whatever surface it is given — but its own report of the video's size is
+not trustworthy. Measured on the emulator: it announced **540×540** for a stream that renders as
+16:9, and sizing the surface by that number turned a full-screen picture into a letterboxed square.
+The attempt was reverted; the size feed stays on the mirroring path, where it comes from the stream.
+
+So for URL playback the box comes from geometry alone (`MirrorFit.fallbackBoxFor`):
+
+| Panel | Box | Result |
+|---|---|---|
+| Landscape | the container, 1920×1080 | unchanged from before this feature — verified by screenshot |
+| Rotated | the container **transposed**, 1080×1920 | `MediaPlayer` letterboxes inside it, the rotation turns it into place, and the picture is complete rather than clipped |
+
+That last row is the reason the fallback transposes rather than filling: rotating a container-sized
+box produces an area larger than the window on one axis, and the window clips it — the picture came
+out zoomed and cut off until this was fixed. Screenshot-verified on the emulator: a landscape 16:9
+source on a rotated panel is shown rotated, whole, in a 607-pixel-wide strip.
+
+## 4. The fit mathematics
 Extracted as a pure function so the interesting part is testable without a device
 (the `SpsParser` / `OverlayDecision` precedent):
 

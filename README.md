@@ -77,7 +77,11 @@ socket loops and the player are not (see `docs/ARCHITECTURE.md` → Known gaps).
 - Settings for display name, mirror resolution, mirror audio, PIN auth, video URL
   mode, portrait TV (rotated panel), start-on-boot, and a debug stats overlay
 - Two flavors: Google TV (Android 10+) and Fire TV (Android 7.1+)
-- No ads, no analytics, no network calls beyond the local subnet
+- No ads, no analytics, and no requests of its own: the traffic is what a session needs —
+  discovery and media on the local network, plus media at a URL a sender explicitly hands over
+- Cleartext HTTP is permitted for those media fetches, because the host is chosen by the sender
+  (or by a DLNA control point) rather than by us — see
+  `app/src/main/res/xml/network_security_config.xml`
 - GPLv3, with complete source
 
 ---
@@ -223,8 +227,10 @@ No SDK on hand? The SDK-free subset still runs:
 - **Buffered audio (type 103)** is accepted but not played back.
 - **Portrait TV rotates the picture, not your TV.** It is for a panel that has been
   rotated 90° by hand: the mirrored picture is turned to match, and the app's own UI stays
-  landscape. Leaving the app ends the rotation. Correct framing has not been verified
-  against a real sender.
+  landscape. Leaving the app ends the rotation. The first hardware test showed the rotation
+  had been applied to a view type that ignores it; the picture is now carried by a
+  `TextureView` while the panel is rotated, and an emulator check confirms it rotates and
+  stays whole — the panel itself still needs a re-test.
 - **Turning video URL mode off does not make a sender mirror.** It refuses the
   sender's URL instead; a video app will usually report that it cannot play on this
   TV, and you have to start Screen Mirroring yourself.

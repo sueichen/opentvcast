@@ -102,7 +102,8 @@ streaming variants:
   legacy RAOP audio UDP RTP on 6001    → AlacDecoder     → AudioPlayer
   buffered audio    BufferedAudioServer (AirPlay 2 type 103)
   still photos      PhotoHandler       → photoFrame flow
-  URL video         AirPlayVideoPlayer (MediaPlayer onto the same Surface)
+  URL video         AirPlayVideoPlayer (MediaPlayer onto the same Surface; forwards the
+                    sender's Referer, and never runs while a mirror stream is live)
   clock sync        TimingHandler / NTP on 6002
   reverse control   DacpClient (TV remote → sender's _dacp._tcp service)
 ```
@@ -129,6 +130,14 @@ Two cross-cutting peers:
 
 ## 5. Application layer (`:app`)
 
+- **`StreamingScreen`** — carries the mirrored picture (and URL playback) on **two views, exactly
+  one visible**: a `SurfaceView` for the ordinary landscape panel, and a `TextureView` when
+  "Portrait TV" says the panel is rotated. The reason is a platform limit, not taste — a
+  `SurfaceView` composites its own surface and silently ignores `rotation` (measured on hardware),
+  while a `TextureView` honours it and costs one GPU copy. `getSurface()` returns whichever view is
+  showing, so a mid-session switch hands the decoder a different `Surface`; `MirrorStreamServer`
+  already rebuilds the decoder when that happens. The framing arithmetic lives in
+  `:core/video/MirrorFit` so it is testable without a device.
 - **`MainActivity`** — the only Activity. It binds `CastService`, collects the
   service flows, and picks exactly one overlay. That priority is not inline any
   more: `OverlayDecision` owns it and the tests exercise it directly:
@@ -157,6 +166,13 @@ Permissions declared: INTERNET, ACCESS_WIFI_STATE, ACCESS_NETWORK_STATE,
 CHANGE_WIFI_MULTICAST_STATE, FOREGROUND_SERVICE,
 FOREGROUND_SERVICE_CONNECTED_DEVICE, RECEIVE_BOOT_COMPLETED,
 POST_NOTIFICATIONS. If you add one, justify it in the manifest next to it.
+
+Network policy: `res/xml/network_security_config.xml` permits **cleartext HTTP**, and that is
+deliberate — the receiver fetches media at URLs it did not choose (an AirPlay sender's `/play`
+body, a DLNA control point's `SetAVTransportURI`), and Android blocks cleartext by default from
+target SDK 28 on. Without it every such fetch dies inside `MediaPlayer` and the user sees a black
+screen. `MediaNetworkPolicyTest` pins both the file and the manifest attribute, because nothing
+else in the build notices if either disappears.
 
 ---
 

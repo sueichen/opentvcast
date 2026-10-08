@@ -304,7 +304,10 @@ class MainActivity : AppCompatActivity() {
         streamingContainer.visibility = View.GONE
     }
 
-    /** Returns the SurfaceView Surface for the VideoDecoder. */
+    /**
+     * The Surface the decoder should render to: the SurfaceView's on a normal panel, the
+     * TextureView's when "Portrait TV" is on (a SurfaceView's content cannot be rotated).
+     */
     fun getVideoSurface() = streamingScreen.getSurface()
 
     /**

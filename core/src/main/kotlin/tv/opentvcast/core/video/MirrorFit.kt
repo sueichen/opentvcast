@@ -98,4 +98,30 @@ object MirrorFit {
             FitBox(widthPx = displayedWidth, heightPx = displayedHeight)
         }
     }
+
+    /**
+     * The box to give the view while the picture's **size is not known yet**.
+     *
+     * Rotation has to be honoured even here, and that is the point of this function rather than
+     * "fill the container": a rotated view is laid out as the transpose of what it displays, so it
+     * must be laid out as the container *transposed* — 1080×1920 inside a 1920×1080 window. A
+     * container-sized box on a rotated view rotates into an area larger than the window on one axis,
+     * and the window clips it: the picture comes out cropped rather than framed.
+     *
+     * Why this case exists at all: URL playback hands the picture to `MediaPlayer`, which letterboxes
+     * correctly inside whatever surface it is given but cannot be asked for a trustworthy size — it
+     * reported a container-declared 540×540 for a stream that renders as 16:9 (measured). So the
+     * surface is sized by geometry alone and the player does the rest.
+     *
+     * @return `null` when the container itself is not known, and the caller falls back to filling it.
+     */
+    fun fallbackBoxFor(containerWidth: Int, containerHeight: Int, rotationDegrees: Int): FitBox? {
+        if (containerWidth <= 0 || containerHeight <= 0) return null
+        val rotated = rotationDegrees == 90 || rotationDegrees == 270
+        return if (rotated) {
+            FitBox(widthPx = containerHeight, heightPx = containerWidth)
+        } else {
+            FitBox(widthPx = containerWidth, heightPx = containerHeight)
+        }
+    }
 }
