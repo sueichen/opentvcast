@@ -60,6 +60,17 @@ literal copy of the service action strings. Both sides now read one object.
   `XxxKt.initializationError`, which says nothing about the cause.
 - **Do not string-replace inside an XML fixture.** Turning `s:` into `soapenv:`
   also corrupts `xmlns:s=` into `xmlnsoapenv:s=`. Write the second fixture out.
+- **A pure function's tests do not cover its use.** `MirrorFit` had eleven tests and the
+  view could still have passed it the wrong angle, or ignored its answer: the wiring is a
+  separate fact from the arithmetic. One view-level test closes that gap — Robolectric,
+  measure and lay the view out by hand, and call the layout decision directly instead of
+  waiting out its timer (`internal` rather than `private`, with the reason written next to
+  it). Three mutations confirmed it has teeth: passing the wrong angle, not applying the
+  rotation, and reverting `clipChildren` were each caught.
+- **Geometry wants a property test, not only examples.** Truncating `1170 × (1920 / 2532)`
+  gives `1919.999 → 1919`, a hairline seam on the edge that is supposed to touch. Hand-picked
+  examples would have missed it; "the axis `min()` chose is filled exactly", asserted across
+  the aspect ratios real phones produce, caught it. Assert the invariant, not just the cases.
 - **Do not reach for Robolectric unless the runtime is genuinely needed.** Its
   sandbox classloader hides classes from JaCoCo *and* the class cannot run in the
   SDK-free aggregate runner. A whole test class measured 0% for this reason while
@@ -85,6 +96,8 @@ literal copy of the service action strings. Both sides now read one object.
 | Per-connection state that outlives the connection | The previous sender's remote address leaked into the next session. Clear it in one place (`resetConnectionState`). |
 | Uncancelled coroutine scopes | `ReceiverRegistry`'s `SupervisorJob` scope lived for the process. Make long-lived owners `AutoCloseable`. |
 | Empty `catch` blocks | Five of them vanished exceptions entirely. Catch the specific expected exception (e.g. `SocketTimeoutException`) and log the rest. |
+| Rotating the display from an app | **An application cannot rotate an Android TV's display.** `requestedOrientation = PORTRAIT` is accepted by the framework and changes nothing (measured: `mRotation=0`, window `land television`); only the system-wide `user_rotation` setting moves it, and that needs `WRITE_SETTINGS` and outlives the app. Do orientation-shaped work inside your own window. `user_rotation` is the probe that tells "the panel can't rotate" apart from "an app may not ask". |
+| Removing `clipChildren = false` while tidying | A rotated view's layout box must be the **transpose** of what it displays, so the box can be taller than its window; the overhang is empty space and clipping it cuts the picture. Nothing else in the build fails if that attribute disappears — pin it with a test. |
 | Advertising the port you *asked* for | The allocator may substitute. Publish the granted port in mDNS, in SSDP `LOCATION` and in every document URL. |
 | Collectors started per bind without cancelling the last round | Every reconnect stacked another set. Use `RebindableCollectorGroup`. |
 

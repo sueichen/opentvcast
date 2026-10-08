@@ -151,8 +151,13 @@ class StreamingScreen @JvmOverloads constructor(
      *   `clipChildren` is off.
      * - **Rotation is re-applied when the setting changes**, not only when the video size does —
      *   the user can flip "Portrait TV" while a mirror is running.
+     *
+     * `internal` rather than private so a unit test can call it without waiting for the 200 ms
+     * tick. The wiring it performs — read the angle, ask [MirrorFit], apply box and rotation — is
+     * the part a pure `MirrorFit` test cannot cover: passing the wrong angle, or forgetting to
+     * apply the answer, would leave every `MirrorFit` test green and the picture wrong.
      */
-    private fun applyAspectFit() {
+    internal fun applyAspectFit() {
         val degrees = PanelOrientationState.rotationDegrees
         val box = MirrorFit.boxFor(
             videoWidth = StreamStats.videoWidth,

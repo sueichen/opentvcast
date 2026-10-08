@@ -85,6 +85,9 @@ sourceSets {
                 // The pure half of the same coverage is plain JUnit and does run
                 // here (AndroidNetworkMonitorTest).
                 "**/platform/net/AndroidNetworkMonitorSmokeTest.kt",
+                // Needs Robolectric (a View, a LayoutInflater) and the ui/** sources this
+                // runner excludes. Runs under :app:testGoogletvDebugUnitTest.
+                "**/ui/StreamingScreenTest.kt",
 
                 // VideoDecoder is shadowed by src/stubs/VideoDecoder.kt, which drops
                 // the MediaCodec/Surface wiring but keeps the companion members

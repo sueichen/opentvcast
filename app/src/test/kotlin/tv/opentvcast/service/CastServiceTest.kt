@@ -50,6 +50,13 @@ class CastServiceTest {
     }
 
     @Test
+    fun `ACTION_APPLY_SETTINGS has package-qualified value`() {
+        // Same guard as the other three: the value is the wire contract between
+        // ServiceController and CastService, and the :test-runner stub re-exports it.
+        assertEquals("tv.opentvcast.action.APPLY_SETTINGS", CastService.ACTION_APPLY_SETTINGS)
+    }
+
+    @Test
     fun `NOTIFICATION_ID is positive`() {
         assertTrue(
             "NOTIFICATION_ID must be > 0 (Android rejects 0)",
@@ -63,7 +70,7 @@ class CastServiceTest {
     }
 
     @Test
-    fun `all three ACTION constants are distinct`() {
+    fun `all ACTION constants are distinct and none is empty`() {
         val actions = setOf(
             CastService.ACTION_START,
             CastService.ACTION_STOP,
