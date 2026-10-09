@@ -157,6 +157,8 @@ whose tests cover the video endpoints.
 | `AppSettingsTest` | `:app` | default is `true`; `copy` keeps other fields |
 | `SettingsRepositoryTest` | `:app` (Robolectric) | key round-trips; a pre-existing settings file loads with the default |
 | — | — | The receiver-level live stop has **no unit test** (deviation from the plan above): `urlVideoPlayer` is a concrete private field with no injected seam, and adding one meant either an interface for `AirPlayVideoPlayer` or a player factory — a refactor wider than this feature. Its behaviour was verified on the emulator instead (§5), and the decision table that matters is unit-tested one layer down in `RtspVideoControlTest`. |
+| — | — | The same applies to the player's **surface re-attach check**: it acts on a concrete `MediaPlayer`, so it is verified by hand rather than by a JVM test. What *is* tested is the header policy (`mediaHeaders`) and the `/play` parsing, both of which are pure. |
+| — | — | **One media path at a time** is a rule, not a test: `AirPlayReceiver.stopUrlPlaybackForIncomingStream` is called by every path that starts an incoming stream (mirror video, mirror audio, buffered audio), and `startUrlVideo` stops the mirror streams. The receiver has no seam that a JVM test could drive, so the rule is asserted by reading one function instead of by a test. |
 
 End-to-end check (emulator, cheap): `adb forward tcp:18200 tcp:8200` is DLNA; for
 this feature the check is `curl`-style `POST /play` against RTSP port 7000 with the

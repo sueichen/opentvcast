@@ -110,9 +110,13 @@ carried over from upstream PhairPlay is noted where the requirement changed mean
 
 ### 1.3 DLNA / UPnP AV MediaRenderer
 
-**Status: implemented, not verified on hardware.** The `:dlna` module implements the
-requirements below; the settings toggle and the status card are wired to it. No part of
-it has been exercised against a real control point, so treat FR-37 as unproven.
+**Status: implemented, not verified on hardware — and its video path cannot render at all.** The
+`:dlna` module implements the requirements below; the settings toggle and the status card are wired
+to it. No part of it has been exercised against a real control point, so treat FR-37 as unproven.
+Separately, found by review on 2026-10-09: the DLNA player leases its render surface from
+`SurfaceSink` and **nothing in production publishes one**, so `acquire` times out and playback
+degrades to audio-only ("playing without video" in the log). FR-36 is therefore unmet in practice,
+not merely unverified — see `docs/ARCHITECTURE.md` §3 and §7.
 
 - FR-32: Respond to SSDP `M-SEARCH` and send `ssdp:alive` / `ssdp:byebye` notifications on UDP 1900.
 - FR-33: Serve a device description document and per-service SCPD over a dynamically allocated TCP port, and publish the actual granted port in the SSDP `LOCATION` header (FR-20).

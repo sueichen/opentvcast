@@ -146,6 +146,13 @@ internal class RtspVideoControl(
          * Keys are matched case-insensitively for `Referer` only: `Content-Location` is Apple's own
          * key and is matched exactly, while `Referer` is outside Apple's plist contract and is seen
          * spelled both ways in the wild.
+         *
+         * A blank `Referer` becomes `null` on **both** paths, because "the sender sent an empty
+         * value" and "the sender sent none" are the same fact downstream — and a header that is
+         * present but empty is worse than an absent one: some CDNs read it as a page referral and
+         * refuse, where an absent one is simply a direct request. The plist path used to keep the
+         * empty string and the legacy path normalise it, which is the kind of split that only shows
+         * up on one sender's traffic.
          */
         internal fun parsePlayBody(request: RtspRequest): PlayRequest {
             if (request.isPlistBody()) {
@@ -157,7 +164,7 @@ internal class RtspVideoControl(
                 return PlayRequest(
                     url = p["Content-Location"] as? String,
                     startFraction = (p["Start-Position"] as? Double) ?: 0.0,
-                    referer = p.valueFor("Referer"),
+                    referer = p.valueFor("Referer")?.let { normaliseReferer(it) },
                 )
             }
             // Legacy text body: "Content-Location: <url>\r\nStart-Position: <float>\r\n"
@@ -167,13 +174,17 @@ internal class RtspVideoControl(
             request.body.lineSequence().forEach { line ->
                 when {
                     line.startsWith("Content-Location:", true) -> url = line.substringAfter(":").trim()
-                    line.startsWith("Referer:", true) -> referer = line.substringAfter(":").trim()
+                    line.startsWith("Referer:", true) ->
+                        referer = normaliseReferer(line.substringAfter(":").trim())
                     line.startsWith("Start-Position:", true) ->
                         start = line.substringAfter(":").trim().toDoubleOrNull() ?: 0.0
                 }
             }
-            return PlayRequest(url, start, referer?.ifBlank { null })
+            return PlayRequest(url, start, referer)
         }
+
+        /** Trims a sender-supplied `Referer` and reduces a blank one to null. See [parsePlayBody]. */
+        private fun normaliseReferer(value: String): String? = value.trim().ifBlank { null }
 
         /** Case-insensitive lookup of a plist string field. */
         private fun Map<String, Any?>.valueFor(key: String): String? =

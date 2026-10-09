@@ -87,6 +87,16 @@ Four defaults back it (`DefaultReceiverEnvironment`, and `:platform`'s
 This is not defensive architecture for its own sake: every one of those four
 behaviours was missing upstream, and each produced a silent failure.
 
+**The fifth facility on that interface is not wired, and that is a live defect.** `surfaceSink`
+(`SurfaceSink` / `SimpleSurfaceSink`) is implemented, contracted by `SurfaceSinkContractTest`, and
+exercised by its own tests — but **nothing in production ever calls `publish()`**. The DLNA player
+leases its render target with `surfaceSink.acquire(DLNA_VIDEO)`, so the acquisition waits out its
+timeout and the player falls back to audio-only, logging *"DLNA: no surface available — playing
+without video"*. In other words DLNA video playback cannot show a picture, and the AirPlay paths
+never use the sink at all (they pass a raw `() -> Surface?` provider). Found by the 2026-10-09 review;
+fixing it means deciding who publishes the surface and what happens when two protocols both want it,
+which is a design change rather than a patch.
+
 ---
 
 ## 4. AirPlay receiver (`:airplay`)
@@ -137,7 +147,8 @@ Two cross-cutting peers:
   while a `TextureView` honours it and costs one GPU copy. `getSurface()` returns whichever view is
   showing, so a mid-session switch hands the decoder a different `Surface`; `MirrorStreamServer`
   already rebuilds the decoder when that happens. The framing arithmetic lives in
-  `:core/video/MirrorFit` so it is testable without a device.
+  `:core/video/MirrorFit` so it is testable without a device, and `MirrorFit.isRotated` is the single
+  definition of what "rotated" means — the box maths and the view that picks the renderer both ask it.
 - **`MainActivity`** — the only Activity. It binds `CastService`, collects the
   service flows, and picks exactly one overlay. That priority is not inline any
   more: `OverlayDecision` owns it and the tests exercise it directly:
@@ -216,6 +227,10 @@ Stated here rather than buried in a roadmap:
   and receiver lifecycle *are* unit-tested over loopback with an injected player
   (see `docs/TESTING.md` §7); what no test can reach is a real Windows/Android
   control point.
+- **DLNA video playback cannot render today**, for a reason no test catches: its player leases a
+  surface from `SurfaceSink`, and nothing publishes one (see §3). It degrades to audio-only by
+  design of that fallback, so the failure is a log line rather than an error. This is unrelated to
+  the AirPlay work and needs its own change plus a real control point to verify.
 - **No device verification has happened.** Nothing here has been exercised
   against real macOS/iOS senders under the current architecture. Every protocol
   claim rests on code correctness and unit tests, not observed streams.

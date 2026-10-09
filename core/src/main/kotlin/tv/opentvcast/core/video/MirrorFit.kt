@@ -50,6 +50,23 @@ object MirrorFit {
     const val NO_ROTATION = 0
 
     /**
+     * Whether [rotationDegrees] asks for a quarter turn — **the** definition, used by everything that
+     * has to agree about it.
+     *
+     * Three places need this answer: the two box functions below, and the view that decides whether
+     * the picture goes to a `TextureView` (the only view type that can carry the rotation). They were
+     * written separately once, with two different rules — `== 90 || == 270` for the boxes and `!= 0`
+     * for the view — which agree on every angle the settings can produce and disagree on every other
+     * one. That is the same shape as the defect this feature was fixed for: two places that must
+     * agree, drifting apart because neither was the definition.
+     *
+     * Anything that is not a quarter turn counts as no rotation, so a bad value degrades to today's
+     * behaviour instead of producing something arbitrary.
+     */
+    fun isRotated(rotationDegrees: Int): Boolean =
+        rotationDegrees == 90 || rotationDegrees == 270
+
+    /**
      * The size to give the video view.
      *
      * @param rotationDegrees clockwise rotation that will be applied to the view:
@@ -67,7 +84,7 @@ object MirrorFit {
     ): FitBox? {
         if (videoWidth <= 0 || videoHeight <= 0 || containerWidth <= 0 || containerHeight <= 0) return null
 
-        val rotated = rotationDegrees == 90 || rotationDegrees == 270
+        val rotated = isRotated(rotationDegrees)
 
         // Extents as they will occupy the container, accounting for the rotation.
         val effectiveWidth = if (rotated) videoHeight else videoWidth
@@ -117,7 +134,7 @@ object MirrorFit {
      */
     fun fallbackBoxFor(containerWidth: Int, containerHeight: Int, rotationDegrees: Int): FitBox? {
         if (containerWidth <= 0 || containerHeight <= 0) return null
-        val rotated = rotationDegrees == 90 || rotationDegrees == 270
+        val rotated = isRotated(rotationDegrees)
         return if (rotated) {
             FitBox(widthPx = containerHeight, heightPx = containerWidth)
         } else {

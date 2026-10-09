@@ -47,22 +47,41 @@ artifacts.
 
 | Tier | Task | Classes | Tests | Notes |
 |---|---|---|---|---|
-| `:core` | `:core:test` | 16 | 184 | Plain JUnit. Fastest meaningful gate. |
+| `:core` | `:core:test` | 16 | 186 | Plain JUnit. Fastest meaningful gate. |
 | `:platform` | `:platform:testDebugUnitTest` | 6 | 46 | Android helpers. Mostly plain JUnit — Robolectric only where a real `Context` is unavoidable. |
-| `:airplay` | `:airplay:testDebugUnitTest` | 39 | 339 | **Must live here**: many tests drive `internal` members, which do not cross a module boundary. |
+| `:airplay` | `:airplay:testDebugUnitTest` | 39 | 346 | **Must live here**: many tests drive `internal` members, which do not cross a module boundary. |
 | `:dlna` | `:dlna:testDebugUnitTest` | 11 | 99 | UPnP protocol logic **plus** its sockets and receiver lifecycle over loopback (§7): SSDP, documents, SOAP, routing, GENA, HTTP server, receiver start/stop. |
-| `:app` | `:app:testGoogletvDebugUnitTest` (and `…Firetv…`) | 10 | 82 | UI, service, settings, Android adapters. Both flavours run the same suite. |
+| `:app` | `:app:testGoogletvDebugUnitTest` (and `…Firetv…`) | 11 | 87 | UI, service, settings, Android adapters. Both flavours run the same suite. |
 | `:test-runner` | `:test-runner:test` | *aggregate* | *superset* | JVM-only aggregated build — see §3. |
 | instrumented | `:app:assembleGoogletvDebugAndroidTest` | 1 | compile only | **Compile gate**, not execution — no emulator in CI. |
 
-Module-native, deduplicated total: **750** (core 184, platform 46, airplay 339,
-dlna 99, app 82). The rise from 703 was two features landing — portrait-panel rotation and
+Module-native, deduplicated total: **764** (core 186, platform 46, airplay 346,
+dlna 99, app 87). The rise from 703 was two features landing — portrait-panel rotation and
 the video-URL-mode switch — including one view-level test (`StreamingScreenTest`, in `:app`
 because it needs Robolectric) that covers wiring the pure `MirrorFit` tests cannot reach. The
-last 14 came from a real-device test round: the sender's `Referer`, the cleartext network
-policy, the no-size framing fallback, and the assertion that the `SurfaceView` is never asked
-to rotate (it cannot). The aggregate runner's number is a superset and deliberately not
-part of that count.
+rest came from a real-device test round and the review that followed it: the sender's `Referer`,
+the cleartext network policy, the no-size framing fallback, the assertion that the `SurfaceView`
+is never asked to rotate (it cannot), the degenerate `/play` bodies a sender can actually send,
+and one test per place where two rules had to be made to agree. The aggregate runner's number is
+a superset and deliberately not part of that count.
+
+### What the coverage numbers mean here
+
+Two readings from the last review are worth keeping in view, because both look worse or better
+than they are:
+
+| File | Line coverage | Reading |
+|---|---|---|
+| `core/video/MirrorFit.kt` | 100 % | The arithmetic and the "is it rotated?" definition — pure, and the only place either lives. |
+| `airplay/RtspVideoControl.kt` | 100 % | The `/play` body parsing, including the bodies that are not what they claim to be. |
+| `app/ui/PanelOrientationState.kt` | 100 % | Deliberately plain JUnit: under Robolectric this file measured **0 % while passing**. |
+| `app/ui/StreamingScreen.kt` | 0 % | **A measurement artefact, not a gap.** A `View` needs Robolectric, whose sandbox classloader hides classes from JaCoCo — the same trap `:platform`'s monitor test fell into (PITFALLS). The tests run and fail when the wiring breaks: see the mutation results below. |
+| `airplay/AirPlayVideoPlayer.kt` | 7 % | Only the pure parts are reachable from a JVM: the class owns a concrete `MediaPlayer`, so the surface retry and the surface re-attach check are verified by hand on hardware (deviations recorded in the feature design docs). |
+
+Mutation sweep over the fix round (each mutation injected, tests run, mutation reverted): **7 of 7
+caught** — the view that picks the renderer, the rotation predicate, the transposed fallback box,
+the `Referer` forwarding, the `Referer` parsing, the cleartext policy, and the rotation landing on
+the `SurfaceView` that ignores it. The harness is `_work/mutation-review.py`.
 
 Treat these counts as a map of coverage, not a target: they will drift with
 every commit, and a number frozen in a document is how docs rot.

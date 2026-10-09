@@ -172,8 +172,16 @@ class StreamingScreen @JvmOverloads constructor(
      * "which surface the decoder writes to" cannot disagree. (They disagreed once: the box was
      * transposed for a rotated panel while the picture went to the SurfaceView, which cannot rotate,
      * and the result was a sideways picture on a real TV.)
+     *
+     * It also delegates the *definition* of "rotated" to [MirrorFit.isRotated] rather than testing
+     * `!= 0` itself, because the same question is asked when the box is computed: two rules that
+     * agreed on every angle the settings produce, and disagreed on every other one, is exactly how
+     * the bug above came about.
+     *
+     * [degrees] is a parameter so a test can ask about an angle the settings cannot produce.
      */
-    internal fun usesTextureView(): Boolean = PanelOrientationState.rotationDegrees != 0
+    internal fun usesTextureView(degrees: Int = PanelOrientationState.rotationDegrees): Boolean =
+        MirrorFit.isRotated(degrees)
 
     /** The view currently showing the picture. `internal` so a test can assert the switch. */
     internal fun activeView(): View = if (usesTextureView()) textureView else surfaceView
@@ -227,7 +235,7 @@ class StreamingScreen @JvmOverloads constructor(
         lastSurfaceH = targetH
         lastRotation = degrees
 
-        val useTexture = usesTextureView()
+        val useTexture = usesTextureView(degrees)
         surfaceView.visibility = if (useTexture) INVISIBLE else VISIBLE
         textureView.visibility = if (useTexture) VISIBLE else INVISIBLE
 

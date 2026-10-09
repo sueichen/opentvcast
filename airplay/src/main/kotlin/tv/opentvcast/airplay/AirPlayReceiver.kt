@@ -479,6 +479,7 @@ class AirPlayReceiver(
      * @return the data server's TCP port (macOS connects here to send H.264).
      */
     private fun startMirrorStream(streamConnectionId: Long): Int {
+        stopUrlPlaybackForIncomingStream("Mirror stream starting")
         val aesKey = mirrorAesKey ?: run { Logger.e("mirror stream start before keys set"); return 0 }
         val ecdhSecret = mirrorEcdhSecret ?: return 0
         return MirrorStreamServer(aesKey, ecdhSecret, streamConnectionId, videoSurfaceProvider, mirrorWidth, mirrorHeight)
@@ -493,6 +494,7 @@ class AirPlayReceiver(
 
     /** Mirror SETUP audio stream (type 96): start the AAC-ELD / AAC-LC / ALAC audio server. @return (dataPort, controlPort). */
     private fun startMirrorAudio(sampleRate: Int, channels: Int, codecType: Int, framesPerPacket: Int): Pair<Int, Int> {
+        stopUrlPlaybackForIncomingStream("Mirror audio stream starting")
         val aesKey = mirrorAesKey ?: run { Logger.e("audio start before keys set"); return 0 to 0 }
         val ecdhSecret = mirrorEcdhSecret ?: return 0 to 0
         val aesIv = mirrorAesIv ?: return 0 to 0
@@ -566,16 +568,40 @@ class AirPlayReceiver(
         }
     }
 
-    /** Stops AirPlay video URL playback (POST /stop or end-of-media) and ends the session. */
-    private fun stopUrlVideo() {
+    /**
+     * The receiver plays **one thing at a time**: an incoming stream takes over the Surface and the
+     * audio path, so URL playback stops when one starts. Every stream that can start mid-session goes
+     * through here rather than each path deciding for itself — that is how the reverse order (URL
+     * playback starting while a mirror ran) came to be handled and this one left unhandled.
+     */
+    private fun stopUrlPlaybackForIncomingStream(reason: String) {
+        if (urlVideoPlayer == null) return
+        Logger.i("$reason — stopping URL playback (one media path at a time)")
+        releaseUrlPlayer()
+    }
+
+    /**
+     * Releases the URL player **without touching the streaming state**.
+     *
+     * Used where a different media path is *taking over* the shared Surface or the audio path — the
+     * sender starting to mirror, or switching to music — because there the streaming overlay is about
+     * to be shown, not torn down, and announcing "streaming stopped" would hide it again.
+     */
+    private fun releaseUrlPlayer() {
         urlVideoPlayer?.release()
         urlVideoPlayer = null
+    }
+
+    /** Stops AirPlay video URL playback (POST /stop or end-of-media) and ends the session. */
+    private fun stopUrlVideo() {
+        releaseUrlPlayer()
         onStreamingStopped()
         Logger.i("AirPlay URL video stopped")
     }
 
     /** Starts the AirPlay 2 buffered audio-only stream (type 103, Apple Music → TV); returns its TCP port. */
     private fun startBufferedAudio(): Int {
+        stopUrlPlaybackForIncomingStream("Buffered audio stream starting")
         bufferedAudioServer?.stop()
         val server = BufferedAudioServer().also { bufferedAudioServer = it; it.start(scope) }
         // buffered audio (type 103) is always audio-only
@@ -603,8 +629,7 @@ class AirPlayReceiver(
         audioServer = null
         bufferedAudioServer?.stop()
         bufferedAudioServer = null
-        urlVideoPlayer?.release()
-        urlVideoPlayer = null
+        releaseUrlPlayer()
         ntpClient?.stop()
         ntpClient = null
         try { eventClientSocket?.close() } catch (e: Exception) { Logger.d("Close eventClientSocket failed (non-fatal): ${e.message}") }

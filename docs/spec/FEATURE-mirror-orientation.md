@@ -140,6 +140,20 @@ box produces an area larger than the window on one axis, and the window clips it
 out zoomed and cut off until this was fixed. Screenshot-verified on the emulator: a landscape 16:9
 source on a rotated panel is shown rotated, whole, in a 607-pixel-wide strip.
 
+### 3.5 A switch while a URL video is playing
+
+Switching the setting replaces *which view shows the picture*, and with it the `Surface` the picture
+is written to. The two paths recover differently, and both are deliberate:
+
+| Path | How it recovers |
+|---|---|
+| Mirroring | By itself, per frame: `MirrorStreamServer` compares the provider with the surface it configured and rebuilds its decoder on a change. |
+| URL playback | On the sender's next transport verb — `/playback-info` poll, `/rate`, `/scrub` — which is normally within about a second. A `MediaPlayer` has no frame loop of ours to hook, and it cannot be told to re-read a surface, so the check rides on verbs the sender already sends. |
+
+The URL path's check is **not unit-tested**: it acts on a concrete `MediaPlayer` and this class has no
+seam for one (the same deviation the receiver's live URL stop carries — see
+[`FEATURE-video-url-mode.md`](FEATURE-video-url-mode.md) §5). It is exercised by hand on hardware.
+
 ## 4. The fit mathematics
 Extracted as a pure function so the interesting part is testable without a device
 (the `SpsParser` / `OverlayDecision` precedent):

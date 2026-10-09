@@ -229,6 +229,36 @@ class StreamingScreenTest {
         assertSame(portrait.textureView, portrait.active)
     }
 
+    @Test
+    fun `an angle the settings cannot produce is treated as no rotation`() {
+        // The view and the fit maths must agree on what "rotated" means. They were written with two
+        // different rules once — `!= 0` here, `== 90 || == 270` there — and that is exactly how the
+        // sideways-picture defect came about. An out-of-band angle is only askable because the
+        // predicate takes one.
+        val s = screen()
+
+        assertFalse(s.view.usesTextureView(0))
+        assertFalse("a half turn is not a quarter turn", s.view.usesTextureView(180))
+        assertFalse(s.view.usesTextureView(45))
+        assertTrue(s.view.usesTextureView(90))
+        assertTrue(s.view.usesTextureView(270))
+    }
+
+    @Test
+    fun `both views are given the same box, so a switch is instant`() {
+        // Only one is visible at a time, but the hidden one is kept laid out and ready: a mid-session
+        // flip then costs nothing but the visibility change.
+        val s = screen()
+        video(1080, 2340)
+        PanelOrientationState.apply(MirrorOrientation.PORTRAIT, PortraitRotation.LEFT)
+
+        s.view.applyAspectFit()
+
+        assertEquals(s.textureView.layoutParams.width, s.surfaceView.layoutParams.width)
+        assertEquals(s.textureView.layoutParams.height, s.surfaceView.layoutParams.height)
+        assertEquals(886, s.surfaceView.layoutParams.width)
+    }
+
     // ─── the load-bearing layout constraint ────────────────────────────────────
 
     @Test

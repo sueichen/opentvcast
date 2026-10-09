@@ -52,6 +52,8 @@ class AirPlayVideoPlayer(
     private val onEnded: () -> Unit = {},
 ) {
     private var mp: MediaPlayer? = null
+    /** The Surface the player was last given, so a *changed* one can be noticed — see below. */
+    @Volatile private var attachedSurface: Surface? = null
     @Volatile private var prepared = false
     @Volatile private var startFraction = 0.0
     private val retryHandler = Handler(Looper.getMainLooper())
@@ -100,12 +102,46 @@ class AirPlayVideoPlayer(
         Logger.i("AirPlay video: prepared dur=${runCatching { player.duration }.getOrDefault(0)}ms → playing")
     }
 
-    /** Attaches the current Surface, if there is one. Returns whether the player now has a surface. */
+    /**
+     * Attaches the current Surface, if there is one, and remembers it. Returns whether the player now
+     * has a surface.
+     *
+     * A failure is **reported rather than swallowed**: the caller's whole job is to keep asking until
+     * the player has one, and returning `true` on a failed `setSurface` would stop the retries on a
+     * picture that never appears — a black screen with sound, which is the failure the retry exists
+     * to prevent.
+     */
     @Synchronized
     private fun attachSurface(player: MediaPlayer): Boolean {
         val surface = surfaceProvider() ?: return false
-        runCatching { player.setSurface(surface) }
-        return true
+        val attached = runCatching { player.setSurface(surface) }
+            .onFailure { Logger.w("AirPlay video: setSurface failed", it) }
+            .isSuccess
+        if (attached) attachedSurface = surface
+        return attached
+    }
+
+    /**
+     * Re-attaches if the view has produced a **different** Surface since the last attach.
+     *
+     * The picture lives on a Surface that belongs to whichever view is showing it, and that Surface is
+     * replaced when the streaming overlay is hidden and shown again, or when "Portrait TV" switches
+     * between the two views. Mirroring notices by itself — `MirrorStreamServer` compares the provider
+     * with its configured surface on every frame and rebuilds its decoder. This path has no frame
+     * loop, so it checks on the transport verbs a sender already sends during playback
+     * (`/playback-info` polls, `/rate`, `/scrub`). Worst case the picture is black until the sender's
+     * next poll, which is normally about a second.
+     *
+     * Not unit-tested: it acts on a concrete `MediaPlayer`, and this class has no seam for one (the
+     * same deviation the receiver's live URL stop carries). Covered by hand on hardware instead.
+     */
+    @Synchronized
+    private fun reattachSurfaceIfChanged() {
+        val player = mp ?: return
+        val current = surfaceProvider() ?: return       // nothing to attach to right now
+        if (current === attachedSurface) return
+        Logger.i("AirPlay video: Surface changed — re-attaching")
+        attachSurface(player)
     }
 
     /** Keeps asking for a Surface every [SURFACE_ATTACH_RETRY_MS] for about two seconds. */
@@ -130,6 +166,7 @@ class AirPlayVideoPlayer(
     /** rate ≤ 0 pauses, > 0 resumes. */
     @Synchronized
     fun setRate(rate: Float) {
+        reattachSurfaceIfChanged()
         val player = mp ?: return
         runCatching {
             if (rate <= 0f) { if (player.isPlaying) player.pause() }
@@ -140,12 +177,14 @@ class AirPlayVideoPlayer(
     /** Seeks to [positionSec] seconds. */
     @Synchronized
     fun scrub(positionSec: Double) {
+        reattachSurfaceIfChanged()
         runCatching { mp?.seekTo((positionSec * 1000).toInt()) }
     }
 
     /** Current playback snapshot for `/playback-info`, or null if nothing is loaded. */
     @Synchronized
     fun info(): PlaybackInfo? {
+        reattachSurfaceIfChanged()
         val player = mp ?: return null
         if (!prepared) return PlaybackInfo(0.0, 0.0, 0.0, readyToPlay = false)
         val dur = runCatching { player.duration }.getOrDefault(0)
@@ -159,6 +198,7 @@ class AirPlayVideoPlayer(
         retryHandler.removeCallbacksAndMessages(null)
         mp?.let { p -> runCatching { p.stop() }; runCatching { p.release() } }
         mp = null
+        attachedSurface = null
         prepared = false
     }
 

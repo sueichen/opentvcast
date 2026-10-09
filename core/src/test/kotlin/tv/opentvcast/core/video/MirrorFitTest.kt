@@ -11,7 +11,9 @@
 package tv.opentvcast.core.video
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -172,5 +174,34 @@ class MirrorFitTest {
     @Test
     fun `an unrecognised rotation behaves like no rotation, as in boxFor`() {
         assertEquals(FitBox(panelW, panelH), MirrorFit.fallbackBoxFor(panelW, panelH, 45))
+    }
+
+    // ─── the one definition of "rotated" ───────────────────────────────────────
+
+    @Test
+    fun `only a quarter turn counts as rotated`() {
+        // The single definition the boxes and the view share. Anything else must degrade to today's
+        // behaviour rather than to something arbitrary — the two rules this replaced agreed on
+        // 0/90/270 and disagreed on every other angle, which is how a sideways picture shipped.
+        assertTrue(MirrorFit.isRotated(90))
+        assertTrue(MirrorFit.isRotated(270))
+        for (degrees in listOf(0, 45, 180, -90, 360, 1)) {
+            assertFalse("$degrees must mean no rotation", MirrorFit.isRotated(degrees))
+        }
+    }
+
+    @Test
+    fun `the transposition and the predicate cannot disagree`() {
+        // Pins the coupling rather than the predicate alone: whichever way "rotated" is answered, the
+        // box has to follow it, because a rotated view is laid out as the transpose of what it shows.
+        // (`boxFor`'s worked examples already cover the arithmetic for both answers.)
+        for (degrees in listOf(0, 45, 90, 180, 270)) {
+            val box = MirrorFit.fallbackBoxFor(panelW, panelH, degrees)!!
+            assertEquals(
+                "at $degrees the box came out $box",
+                MirrorFit.isRotated(degrees),
+                box == FitBox(panelH, panelW),
+            )
+        }
     }
 }

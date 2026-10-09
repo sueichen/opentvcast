@@ -71,6 +71,26 @@ reproduced here.
 
 ### Fixed
 
+- **One media path at a time, whichever side asks first.** URL playback stopped a running mirror, but
+  a mirror starting while a URL video played was left alone — the same conflict, the other way round,
+  with both writers on one Surface. Every path that starts an incoming stream (mirror video, mirror
+  audio, buffered audio) now goes through one rule in `AirPlayReceiver`, and full teardown releases the
+  player through the same helper.
+- **A failed surface attach no longer reports success.** `setSurface` was wrapped in a `runCatching`
+  whose value was discarded, so a failure stopped the retry that exists to handle exactly that — a
+  black picture with sound, and a log line claiming it was attached. The retry condition is now the
+  real outcome, and a failure is logged.
+- **A URL video re-attaches when the view that carries it changes.** Switching "Portrait TV", or
+  hiding and showing the streaming overlay, replaces the Surface. Mirroring notices per frame and
+  rebuilds its decoder; the URL player has no frame loop, so it checks on the transport verbs a sender
+  already sends (`/playback-info`, `/rate`, `/scrub`) — normally within about a second.
+- **"Is this rotated?" is answered in one place.** The box maths used `== 90 || == 270` and the view
+  that picks the renderer used `!= 0`. They agreed on every angle the settings can produce and
+  disagreed on every other one — the same shape as the defect they were introduced to fix. Both now
+  ask `MirrorFit.isRotated`.
+- **A `Referer` is normalised the same way on both `/play` body shapes.** The plist path kept an empty
+  string where the legacy text path returned null; "sent empty" and "not sent" are the same fact
+  downstream, and a present-but-blank header is worse than an absent one.
 - **Media at a URL the sender supplies is now fetched the way the sender intended.** Two
   silent faults stopped AirPlay URL playback dead. The sender's `Referer`, which travels in
   the `/play` body and is required by a web page's CDN while a native app's in-app link

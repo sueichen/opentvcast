@@ -144,6 +144,47 @@ class RtspVideoControlTest {
         assertEquals(Triple("http://example.com/v.mp4", 0.0, "http://example.com/page"), h.played.single())
     }
 
+    @Test
+    fun `a blank Referer means none on both body shapes`() {
+        // "Sent empty" and "not sent" are the same fact downstream, and a present-but-blank header is
+        // worse than an absent one. The two parsing paths disagreed about this once — the plist path
+        // kept the empty string — which is the kind of split that shows up on one sender's traffic only.
+        val plist = Harness()
+        plist.control.play(
+            RtspRequest(
+                "POST", "/play", emptyMap(), "",
+                PlistCodec.encode(
+                    mapOf("Content-Location" to "https://cdn.example.com/v.mp4", "Referer" to "   ")
+                ),
+            )
+        )
+        assertEquals(null, plist.played.single().third)
+
+        val text = Harness()
+        text.control.play(
+            request("POST", "/play", "Content-Location: https://cdn.example.com/v.mp4\r\nReferer:  \t\r\nStart-Position: 0.0\r\n")
+        )
+        assertEquals(null, text.played.single().third)
+    }
+
+    @Test
+    fun `a padded Referer is trimmed before it is used`() {
+        val h = Harness()
+        h.control.play(
+            RtspRequest(
+                "POST", "/play", emptyMap(), "",
+                PlistCodec.encode(
+                    mapOf(
+                        "Content-Location" to "https://cdn.example.com/v.mp4",
+                        "Referer" to "  https://example.com/page  ",
+                    )
+                ),
+            )
+        )
+
+        assertEquals("https://example.com/page", h.played.single().third)
+    }
+
     // ─── Video URL mode disabled by settings (FR-60, FR-61) ───────────────────
 
     @Test
@@ -193,6 +234,77 @@ class RtspVideoControlTest {
         assertEquals(200, h.control.rate(request("POST", "/rate?value=1")).statusCode)
         assertEquals(200, h.control.scrubGet(request("GET", "/scrub")).statusCode)
         assertEquals(200, h.control.stop(request("POST", "/stop")).statusCode)
+    }
+
+    @Test
+    fun `a caller that supplies no gate gets URL playback, matching the setting's default`() {
+        // The gate's default is part of the contract: a construction site that omits it must not
+        // silently lose the feature, because "Video URL mode" ships enabled. Pins the permissive
+        // default rather than the refusal path.
+        val played = mutableListOf<String>()
+        val control = RtspVideoControl(
+            onVideoPlay = { url, _, _ -> played.add(url) },
+            onVideoRate = {},
+            onVideoScrub = {},
+            onVideoStop = {},
+            onPlaybackInfo = { null },
+        )
+        val body = PlistCodec.encode(mapOf("Content-Location" to "http://example.com/v.mp4"))
+
+        val response = control.play(RtspRequest("POST", "/play", emptyMap(), "", body))
+
+        assertEquals(200, response.statusCode)
+        assertEquals(listOf("http://example.com/v.mp4"), played)
+    }
+
+    // ─── bodies that are not what they claim to be ────────────────────────────
+
+    @Test
+    fun `a body that claims to be a plist but does not decode is rejected`() {
+        // A truncated or corrupt body must not start playback, and must not throw out of the handler.
+        val h = Harness()
+        val garbage = "bplist00".toByteArray() + byteArrayOf(0x7F, 0x00, 0x11, 0x22)
+
+        val response = h.control.play(RtspRequest("POST", "/play", emptyMap(), "", garbage))
+
+        assertEquals(400, response.statusCode)
+        assertTrue(h.played.isEmpty())
+    }
+
+    @Test
+    fun `a plist whose Content-Location is not a string is rejected`() {
+        // Some senders put a number or a nested value there; it is not a URL, so it is not played.
+        val h = Harness()
+        val body = PlistCodec.encode(mapOf("Content-Location" to 42))
+
+        val response = h.control.play(RtspRequest("POST", "/play", emptyMap(), "", body))
+
+        assertEquals(400, response.statusCode)
+        assertTrue(h.played.isEmpty())
+    }
+
+    @Test
+    fun `an unparseable Start-Position starts at the beginning`() {
+        // The position is a convenience, never a reason to refuse a playable URL.
+        val h = Harness()
+        val body = "Content-Location: http://example.com/v.mp4\r\nStart-Position: not-a-float\r\n"
+
+        assertEquals(200, h.control.play(request("POST", "/play", body)).statusCode)
+        assertEquals(Triple("http://example.com/v.mp4", 0.0, null), h.played.single())
+    }
+
+    @Test
+    fun `scrub with nothing loaded reports zero rather than failing`() {
+        // A sender polls /scrub before playback starts; 0/0 is the honest answer, and a 5xx would
+        // make it look as though the session had died.
+        val h = Harness()
+        h.info = null
+
+        val response = h.control.scrubGet(request("GET", "/scrub"))
+
+        assertEquals(200, response.statusCode)
+        assertTrue(response.body.contains("duration: 0.000000"))
+        assertTrue(response.body.contains("position: 0.000000"))
     }
 
     // ─── /rate, /scrub, /stop ─────────────────────────────────────────────────
